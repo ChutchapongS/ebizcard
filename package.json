@@ -9,17 +9,34 @@
   ],
   "scripts": {
     "dev": "turbo run dev",
+    "dev:web": "turbo run dev --filter=@ebizcard/web",
+    "dev:mobile": "turbo run dev --filter=@ebizcard/mobile",
     "build": "turbo run build",
+    "build:web": "turbo run build --filter=@ebizcard/web",
+    "build:mobile": "turbo run build --filter=@ebizcard/mobile",
     "lint": "turbo run lint",
+    "lint:fix": "turbo run lint:fix",
     "type-check": "turbo run type-check",
-    "clean": "turbo run clean"
+    "type-check:watch": "turbo run type-check:watch",
+    "clean": "turbo run clean",
+    "test": "turbo run test",
+    "test:coverage": "turbo run test:coverage",
+    "setup": "npm install && npm run setup:env",
+    "setup:env": "node scripts/setup-env.js",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "supabase:deploy": "supabase functions deploy"
   },
   "devDependencies": {
-    "turbo": "^1.10.12",
     "@types/node": "^20.0.0",
+    "turbo": "^1.10.12",
     "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "react-icons": "^5.5.0"
   }
 }

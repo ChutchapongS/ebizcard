@@ -4,7 +4,7 @@
   "description": "e-BizCard API - Supabase Edge Functions",
   "main": "index.js",
   "scripts": {
-    "dev": "supabase functions serve",
+    "dev": "echo 'API functions are deployed to Supabase. No local dev server needed.'",
     "deploy": "supabase functions deploy",
     "build": "tsc",
     "lint": "eslint . --ext .ts",

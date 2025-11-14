@@ -1,158 +1,199 @@
 'use client';
 
-import React, { useState } from 'react';
-import QRCode from 'react-qr-code';
-import { Download, Share2, Copy } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import React, { useState, useEffect } from 'react';
+import { QrCode, Download, Copy, Check } from 'lucide-react';
 
 interface QRCodeGeneratorProps {
   cardId: string;
   cardName: string;
-  publicUrl: string;
+  className?: string;
 }
 
-export const QRCodeGenerator: React.FC<QRCodeGeneratorProps> = ({
-  cardId,
-  cardName,
-  publicUrl,
-}) => {
-  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+export const QRCodeGenerator = ({ cardId, cardName, className = '' }: QRCodeGeneratorProps) => {
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
+  const [publicUrl, setPublicUrl] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
-  const generateQRCodeDataURL = async () => {
+  // Auto-generate QR code when component mounts
+  useEffect(() => {
+    if (cardId && cardId !== 'undefined' && !cardId.startsWith('demo-')) {
+      generateQRCode();
+    }
+  }, [cardId]);
+
+  const generateQRCode = async () => {
+    // Check if card has an ID (saved to database)
+    if (!cardId || cardId === 'undefined' || cardId.startsWith('demo-')) {
+      alert('กรุณาบันทึกนามบัตรก่อนสร้าง QR Code');
+      return;
+    }
+
+    setIsGenerating(true);
     try {
       const response = await fetch('/api/generate-qr', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cardId }),
       });
 
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('QR API error:', errorData);
+        throw new Error(errorData.error || 'Failed to generate QR code');
+      }
+
       const data = await response.json();
+      
       if (data.success) {
-        setQrCodeDataUrl(data.qrCode);
-        return data.qrCode;
+        setQrCodeUrl(data.qrCode);
+        setPublicUrl(data.publicUrl);
       } else {
-        throw new Error(data.error);
+        throw new Error(data.error || 'Failed to generate QR code');
       }
     } catch (error) {
       console.error('Error generating QR code:', error);
-      toast.error('ไม่สามารถสร้าง QR Code ได้');
-      throw error;
+      const err = error as Error;
+      alert(`ไม่สามารถสร้าง QR Code ได้: ${err.message}`);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
   const downloadQRCode = async () => {
-    try {
-      let dataUrl = qrCodeDataUrl;
-      if (!dataUrl) {
-        dataUrl = await generateQRCodeDataURL();
-      }
+    if (!qrCodeUrl) return;
 
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = `${cardName.replace(/\s+/g, '_')}_QR.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast.success('ดาวน์โหลด QR Code เรียบร้อยแล้ว');
+    setIsDownloading(true);
+    try {
+      const response = await fetch(qrCodeUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `qr-code-${cardName.replace(/\s+/g, '-')}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (error) {
-      toast.error('ไม่สามารถดาวน์โหลด QR Code ได้');
+      console.error('Error downloading QR code:', error);
+      alert('ไม่สามารถดาวน์โหลด QR Code ได้');
+    } finally {
+      setIsDownloading(false);
     }
   };
 
-  const copyPublicUrl = async () => {
+  const copyUrl = async () => {
     try {
       await navigator.clipboard.writeText(publicUrl);
-      toast.success('คัดลอกลิงก์เรียบร้อยแล้ว');
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
     } catch (error) {
-      toast.error('ไม่สามารถคัดลอกลิงก์ได้');
+      console.error('Error copying URL:', error);
+      alert('ไม่สามารถคัดลอกลิงก์ได้');
     }
   };
 
-  const shareCard = async () => {
+  const shareUrl = async () => {
+    const shareData = {
+      title: `นามบัตรดิจิทัล - ${cardName}`,
+      text: `ดูนามบัตรดิจิทัลของ ${cardName}`,
+      url: publicUrl,
+    };
+
     if (navigator.share) {
       try {
-        await navigator.share({
-          title: `นามบัตรของ ${cardName}`,
-          text: `ดูนามบัตรดิจิทัลของ ${cardName}`,
-          url: publicUrl,
-        });
+        await navigator.share(shareData);
       } catch (error) {
         console.log('Error sharing:', error);
       }
     } else {
-      copyPublicUrl();
+      copyUrl();
     }
   };
 
   return (
-    <div className="card">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">
-        แชร์นามบัตรของคุณ
-      </h3>
-      
-      <div className="space-y-4">
-        {/* QR Code Display */}
-        <div className="flex justify-center">
-          <div className="p-4 bg-white rounded-lg border-2 border-gray-200">
-            <QRCode
-              value={publicUrl}
-              size={200}
-              style={{ height: 'auto', maxWidth: '100%', width: '100%' }}
-            />
+    <div className={`bg-white rounded-lg border border-gray-200 p-6 ${className}`}>
+      <div className="text-center">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">QR Code</h3>
+        
+        {qrCodeUrl ? (
+          <div className="space-y-4">
+            <div className="w-48 h-48 mx-auto bg-white border-2 border-gray-200 rounded-lg flex items-center justify-center">
+              <img 
+                src={qrCodeUrl} 
+                alt="QR Code" 
+                className="w-full h-full object-contain"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <p className="text-gray-600 text-sm">
+                สแกนเพื่อดูนามบัตรดิจิทัล
+              </p>
+              
+              <div className="flex items-center justify-center space-x-2">
+                <button
+                  onClick={downloadQRCode}
+                  disabled={isDownloading}
+                  className="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 flex items-center"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  {isDownloading ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด'}
+                </button>
+                
+                <button
+                  onClick={shareUrl}
+                  className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center"
+                >
+                  <QrCode className="w-4 h-4 mr-2" />
+                  แชร์
+                </button>
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* Public URL */}
-        <div>
-          <label className="label">ลิงก์สาธารณะ</label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={publicUrl}
-              readOnly
-              className="input flex-1 text-sm"
-            />
+        ) : (
+          <div className="space-y-4">
+            <div className="w-48 h-48 mx-auto bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+              <QrCode className="w-16 h-16 text-gray-400" />
+            </div>
+            
             <button
-              onClick={copyPublicUrl}
-              className="btn-secondary flex items-center gap-2"
+              onClick={generateQRCode}
+              disabled={isGenerating}
+              className="bg-primary-500 text-white px-6 py-3 rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 flex items-center mx-auto"
             >
-              <Copy size={16} />
-              คัดลอก
+              <QrCode className="w-5 h-5 mr-2" />
+              {isGenerating ? 'กำลังสร้าง...' : 'สร้าง QR Code'}
             </button>
           </div>
-        </div>
+        )}
 
-        {/* Action Buttons */}
-        <div className="flex gap-2">
-          <button
-            onClick={downloadQRCode}
-            className="btn-primary flex items-center gap-2 flex-1"
-          >
-            <Download size={16} />
-            ดาวน์โหลด QR Code
-          </button>
-          
-          <button
-            onClick={shareCard}
-            className="btn-secondary flex items-center gap-2 flex-1"
-          >
-            <Share2 size={16} />
-            แชร์
-          </button>
-        </div>
-
-        {/* Instructions */}
-        <div className="text-sm text-gray-600 bg-gray-50 p-3 rounded-lg">
-          <p className="font-medium mb-1">วิธีใช้งาน:</p>
-          <ul className="space-y-1 text-xs">
-            <li>• สแกน QR Code เพื่อเปิดนามบัตรดิจิทัล</li>
-            <li>• แชร์ลิงก์ให้ผู้อื่นเพื่อดูนามบัตรของคุณ</li>
-            <li>• ดาวน์โหลด QR Code เพื่อพิมพ์หรือใช้ในสื่อต่างๆ</li>
-          </ul>
-        </div>
+        {/* Public URL */}
+        {publicUrl && (
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <p className="text-sm text-gray-600 mb-2">ลิงก์สาธารณะ:</p>
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                value={publicUrl}
+                readOnly
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg bg-gray-50"
+              />
+              <button
+                onClick={copyUrl}
+                className="bg-gray-500 text-white px-3 py-2 rounded-lg hover:bg-gray-600 transition-colors flex items-center"
+              >
+                {isCopied ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

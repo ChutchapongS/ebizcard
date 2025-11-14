@@ -1,34 +1,23 @@
-import QRCode from 'react-native-qrcode-svg';
+import { qrCode } from '../services/supabase';
 
-export const generateQRCode = (url: string, size: number = 200) => {
-  return (
-    <QRCode
-      value={url}
-      size={size}
-      color="black"
-      backgroundColor="white"
-      logoSize={30}
-      logoMargin={2}
-      logoBorderRadius={15}
-      quietZone={10}
-    />
-  );
-};
-
-export const generateQRCodeDataURL = async (url: string): Promise<string> => {
+export const generateQRCode = async (cardId: string) => {
   try {
-    const response = await fetch('/api/generate-qr', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ cardId: url.split('/').pop() }),
-    });
-
-    const data = await response.json();
-    return data.qrCode;
+    const data = await qrCode.generate(cardId);
+    return data;
   } catch (error) {
     console.error('Error generating QR code:', error);
+    throw error;
+  }
+};
+
+export const downloadQRCode = async (qrCodeUrl: string, filename: string) => {
+  try {
+    // For React Native, you would use a library like react-native-fs
+    // or expo-file-system to download the file
+    console.log('Downloading QR code:', qrCodeUrl, filename);
+    // Implementation would depend on the specific file system library used
+  } catch (error) {
+    console.error('Error downloading QR code:', error);
     throw error;
   }
 };

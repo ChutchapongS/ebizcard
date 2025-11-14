@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Logout Complete</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        button { background: #dc2626; color: white; border: none; padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d1fae5; }
+        .error { background: #fee2e2; }
+        .info { background: #dbeafe; }
+        .warning { background: #fef3c7; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Logout Complete</h1>
+    <div id="status" class="status info">Loading...</div>
+    <button onclick="testLogout()">Test Logout</button>
+    <button onclick="checkStatus()">Check Status</button>
+    <button onclick="goToApp()">Go to App</button>
+    <button onclick="clearAll()">Clear All Storage</button>
+    
+    <div id="logs" style="margin-top: 20px; padding: 10px; background: #f3f4f6; border-radius: 4px; max-height: 300px; overflow-y: auto;">
+        <h3>Logs:</h3>
+        <div id="logContent"></div>
+    </div>
+    
+    <script>
+        function log(message) {
+            const logContent = document.getElementById('logContent');
+            const timestamp = new Date().toLocaleTimeString();
+            logContent.innerHTML += `<div>[${timestamp}] ${message}</div>`;
+            logContent.scrollTop = logContent.scrollHeight;
+            console.log(message);
+        }
+        
+        function checkStatus() {
+            const user = localStorage.getItem('user');
+            const session = sessionStorage.getItem('supabase.auth.token');
+            const status = document.getElementById('status');
+            
+            log('🔍 Checking status...');
+            
+            if (user) {
+                try {
+                    const userData = JSON.parse(user);
+                    status.className = 'status success';
+                    status.textContent = `✅ User logged in: ${userData.email || 'Unknown'}`;
+                    log(`✅ User found: ${userData.email}`);
+                } catch (e) {
+                    status.className = 'status error';
+                    status.textContent = '❌ Invalid user data';
+                    log(`❌ Invalid user data: ${e.message}`);
+                }
+            } else {
+                status.className = 'status info';
+                status.textContent = 'ℹ️ No user logged in';
+                log('ℹ️ No user found');
+            }
+            
+            log(`LocalStorage keys: ${Object.keys(localStorage).length}`);
+            log(`SessionStorage keys: ${Object.keys(sessionStorage).length}`);
+            log(`Cookies: ${document.cookie.length > 0 ? 'Present' : 'None'}`);
+            
+            console.log('LocalStorage:', localStorage);
+            console.log('SessionStorage:', sessionStorage);
+            console.log('Cookies:', document.cookie);
+        }
+        
+        function testLogout() {
+            log('🧪 Starting logout test...');
+            
+            // Clear all storage
+            log('🧹 Clearing localStorage...');
+            localStorage.clear();
+            
+            log('🧹 Clearing sessionStorage...');
+            sessionStorage.clear();
+            
+            log('🧹 Clearing cookies...');
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+            
+            log('🧹 Clearing IndexedDB...');
+            if ('indexedDB' in window) {
+                try {
+                    indexedDB.deleteDatabase('supabase');
+                    log('✅ IndexedDB cleared');
+                } catch (e) {
+                    log(`⚠️ Could not clear IndexedDB: ${e.message}`);
+                }
+            }
+            
+            log('✅ All storage cleared');
+            checkStatus();
+            
+            log('🔄 Redirecting to home...');
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        }
+        
+        function clearAll() {
+            log('🧹 Clearing all storage manually...');
+            localStorage.clear();
+            sessionStorage.clear();
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+            checkStatus();
+        }
+        
+        function goToApp() {
+            log('🚀 Going to app...');
+            window.location.href = '/';
+        }
+        
+        // Listen for connection status events
+        window.addEventListener('supabase-connection-status', (event) => {
+            log(`🔗 Connection status: ${event.detail.connected ? 'Connected' : 'Disconnected'} ${event.detail.loggedOut ? '(Logged out)' : ''}`);
+        });
+        
+        checkStatus();
+        log('🧪 Test page loaded');
+    </script>
+</body>
+</html>

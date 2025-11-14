@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
+import ConnectionStatus from '@/components/ConnectionStatus';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -12,7 +13,6 @@ export const metadata: Metadata = {
   authors: [{ name: 'e-BizCard Team' }],
   viewport: 'width=device-width, initial-scale=1',
   themeColor: '#3b82f6',
-  manifest: '/manifest.json',
   icons: {
     icon: '/favicon.ico',
     apple: '/apple-touch-icon.png',
@@ -35,6 +35,7 @@ export default function RootLayout({
       <body className={inter.className}>
         <Providers>
           {children}
+          <ConnectionStatus />
         </Providers>
       </body>
     </html>

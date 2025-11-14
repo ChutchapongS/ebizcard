@@ -55,8 +55,8 @@ enabled = true
 # Port to use for the email testing server web interface.
 port = 54324
 # Uncomment to expose additional ports for testing user applications that send emails.
-# smtp_port = 54325
-# pop3_port = 54326
+smtp_port = 54325
+pop3_port = 54326
 
 [storage]
 enabled = true
@@ -87,7 +87,7 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+enable_confirmations = true
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

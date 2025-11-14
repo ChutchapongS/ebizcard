@@ -12,10 +12,10 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-// Auth helpers
+// Auth service
 export const auth = {
   signUp: async (email: string, password: string, fullName?: string) => {
-    const { data, error } = await supabase.auth.signUp({
+    return await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -24,47 +24,37 @@ export const auth = {
         },
       },
     });
-    return { data, error };
   },
 
   signIn: async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
+    return await supabase.auth.signInWithPassword({
       email,
       password,
     });
-    return { data, error };
   },
 
   signInWithGoogle: async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    return await supabase.auth.signInWithOAuth({
       provider: 'google',
     });
-    return { data, error };
   },
 
   signInWithLinkedIn: async () => {
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    return await supabase.auth.signInWithOAuth({
       provider: 'linkedin',
     });
-    return { data, error };
   },
 
   signOut: async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
+    return await supabase.auth.signOut();
   },
 
-  getCurrentUser: async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    return user;
-  },
-
-  onAuthStateChange: (callback: (event: string, session: any) => void) => {
-    return supabase.auth.onAuthStateChange(callback);
+  resetPassword: async (email: string) => {
+    return await supabase.auth.resetPasswordForEmail(email);
   },
 };
 
-// Business Cards API
+// Business Cards service
 export const businessCards = {
   getAll: async (userId: string) => {
     const { data, error } = await supabase
@@ -72,7 +62,9 @@ export const businessCards = {
       .select('*')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
-    return { data, error };
+
+    if (error) throw error;
+    return data;
   },
 
   getById: async (id: string) => {
@@ -81,16 +73,20 @@ export const businessCards = {
       .select('*')
       .eq('id', id)
       .single();
-    return { data, error };
+
+    if (error) throw error;
+    return data;
   },
 
   create: async (cardData: any) => {
     const { data, error } = await supabase
       .from('business_cards')
-      .insert([cardData])
+      .insert(cardData)
       .select()
       .single();
-    return { data, error };
+
+    if (error) throw error;
+    return data;
   },
 
   update: async (id: string, updates: any) => {
@@ -100,7 +96,9 @@ export const businessCards = {
       .eq('id', id)
       .select()
       .single();
-    return { data, error };
+
+    if (error) throw error;
+    return data;
   },
 
   delete: async (id: string) => {
@@ -108,64 +106,173 @@ export const businessCards = {
       .from('business_cards')
       .delete()
       .eq('id', id);
-    return { error };
+
+    if (error) throw error;
+    return true;
   },
 };
 
-// Templates API
+// Profiles service
+export const profiles = {
+  get: async (userId: string) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  update: async (userId: string, updates: any) => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+};
+
+// Contacts service
+export const contacts = {
+  getAll: async (ownerId: string) => {
+    const { data, error } = await supabase
+      .from('contacts')
+      .select(`
+        *,
+        visitor:profiles!contacts_visitor_id_fkey(id, full_name, email, avatar_url),
+        card:business_cards!contacts_card_id_fkey(id, name, job_title, company)
+      `)
+      .eq('owner_id', ownerId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
+  create: async (contactData: any) => {
+    const { data, error } = await supabase
+      .from('contacts')
+      .insert(contactData)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  delete: async (id: string) => {
+    const { error } = await supabase
+      .from('contacts')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return true;
+  },
+};
+
+// Card Views service
+export const cardViews = {
+  track: async (cardId: string, deviceInfo: string) => {
+    const { data, error } = await supabase
+      .from('card_views')
+      .insert({
+        card_id: cardId,
+        viewer_ip: 'unknown',
+        device_info: deviceInfo,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  },
+
+  getByCardId: async (cardId: string) => {
+    const { data, error } = await supabase
+      .from('card_views')
+      .select('*')
+      .eq('card_id', cardId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  },
+
+  getStats: async (cardId: string) => {
+    const { data, error } = await supabase
+      .from('card_views')
+      .select('*')
+      .eq('card_id', cardId);
+
+    if (error) throw error;
+    
+    const totalViews = data.length;
+    const uniqueViews = new Set(data.map(view => view.viewer_ip)).size;
+    const todayViews = data.filter(view => {
+      const today = new Date().toDateString();
+      const viewDate = new Date(view.created_at).toDateString();
+      return today === viewDate;
+    }).length;
+
+    return {
+      totalViews,
+      uniqueViews,
+      todayViews,
+    };
+  },
+};
+
+// Templates service
 export const templates = {
   getAll: async () => {
     const { data, error } = await supabase
       .from('templates')
       .select('*')
-      .order('name');
-    return { data, error };
-  },
-};
-
-// Contacts API
-export const contacts = {
-  getAll: async (userId: string) => {
-    const { data, error } = await supabase
-      .from('contacts')
-      .select(`
-        *,
-        business_cards!inner(
-          id,
-          name,
-          job_title,
-          company,
-          phone,
-          email
-        )
-      `)
-      .eq('owner_id', userId)
       .order('created_at', { ascending: false });
-    return { data, error };
+
+    if (error) throw error;
+    return data;
   },
 
-  add: async (contactData: any) => {
+  getById: async (id: string) => {
     const { data, error } = await supabase
-      .from('contacts')
-      .insert([contactData])
-      .select()
+      .from('templates')
+      .select('*')
+      .eq('id', id)
       .single();
-    return { data, error };
+
+    if (error) throw error;
+    return data;
   },
 };
 
-// Card Views API
-export const cardViews = {
-  track: async (cardId: string, viewerIp: string, deviceInfo: string) => {
-    const { data, error } = await supabase
-      .from('card_views')
-      .insert([{
-        card_id: cardId,
-        viewer_ip: viewerIp,
-        device_info: deviceInfo,
-      }])
-      .select()
-      .single();
-    return { data, error };
+// QR Code service
+export const qrCode = {
+  generate: async (cardId: string) => {
+    const { data, error } = await supabase.functions.invoke('generate-qr', {
+      body: { cardId },
+    });
+
+    if (error) throw error;
+    return data;
+  },
+};
+
+// vCard service
+export const vCard = {
+  generate: async (cardId: string) => {
+    const { data, error } = await supabase.functions.invoke('generate-vcard', {
+      body: { cardId },
+    });
+
+    if (error) throw error;
+    return data;
   },
 };

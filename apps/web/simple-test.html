@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Logout Test</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        button { background: #dc2626; color: white; border: none; padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d1fae5; }
+        .error { background: #fee2e2; }
+        .info { background: #dbeafe; }
+    </style>
+</head>
+<body>
+    <h1>Simple Logout Test</h1>
+    <div id="status" class="status info">Loading...</div>
+    <button onclick="testLogout()">Test Logout</button>
+    <button onclick="checkStatus()">Check Status</button>
+    <button onclick="goToApp()">Go to App</button>
+    
+    <script>
+        function checkStatus() {
+            const user = localStorage.getItem('user');
+            const status = document.getElementById('status');
+            
+            if (user) {
+                status.className = 'status success';
+                status.textContent = '✅ User is logged in';
+            } else {
+                status.className = 'status info';
+                status.textContent = 'ℹ️ No user logged in';
+            }
+        }
+        
+        function testLogout() {
+            console.log('Testing logout...');
+            localStorage.removeItem('user');
+            localStorage.removeItem('redirect-after-reload');
+            console.log('Cleared storage');
+            checkStatus();
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        }
+        
+        function goToApp() {
+            window.location.href = '/';
+        }
+        
+        checkStatus();
+    </script>
+</body>
+</html>

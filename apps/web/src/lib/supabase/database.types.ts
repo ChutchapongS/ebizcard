@@ -9,29 +9,6 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      profiles: {
-        Row: {
-          id: string
-          email: string
-          full_name: string | null
-          avatar_url: string | null
-          created_at: string
-        }
-        Insert: {
-          id: string
-          email: string
-          full_name?: string | null
-          avatar_url?: string | null
-          created_at?: string
-        }
-        Update: {
-          id?: string
-          email?: string
-          full_name?: string | null
-          avatar_url?: string | null
-          created_at?: string
-        }
-      }
       business_cards: {
         Row: {
           id: string
@@ -43,9 +20,9 @@ export interface Database {
           email: string | null
           address: string | null
           social_links: Json | null
-          theme: string
+          theme: string | null
           created_at: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
           id?: string
@@ -57,9 +34,9 @@ export interface Database {
           email?: string | null
           address?: string | null
           social_links?: Json | null
-          theme: string
+          theme?: string | null
           created_at?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
           id?: string
@@ -71,31 +48,34 @@ export interface Database {
           email?: string | null
           address?: string | null
           social_links?: Json | null
-          theme?: string
+          theme?: string | null
           created_at?: string
-          updated_at?: string | null
+          updated_at?: string
         }
       }
-      templates: {
+      card_views: {
         Row: {
           id: string
-          name: string
-          theme: string
-          preview_url: string
+          card_id: string
+          card_name: string | null
+          viewer_ip: string
+          device_info: string
           created_at: string
         }
         Insert: {
           id?: string
-          name: string
-          theme: string
-          preview_url: string
+          card_id: string
+          card_name?: string | null
+          viewer_ip: string
+          device_info: string
           created_at?: string
         }
         Update: {
           id?: string
-          name?: string
-          theme?: string
-          preview_url?: string
+          card_id?: string
+          card_name?: string | null
+          viewer_ip?: string
+          device_info?: string
           created_at?: string
         }
       }
@@ -122,26 +102,93 @@ export interface Database {
           created_at?: string
         }
       }
-      card_views: {
+      addresses: {
         Row: {
           id: string
-          card_id: string
-          viewer_ip: string
-          device_info: string
+          user_id: string
+          type: string
+          place: string | null
+          address: string
+          tambon: string
+          district: string
+          province: string
+          postal_code: string | null
+          country: string | null
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
-          card_id: string
-          viewer_ip: string
-          device_info: string
+          user_id: string
+          type: string
+          place?: string | null
+          address: string
+          tambon: string
+          district: string
+          province: string
+          postal_code?: string | null
+          country?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          type?: string
+          place?: string | null
+          address?: string
+          tambon?: string
+          district?: string
+          province?: string
+          postal_code?: string | null
+          country?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      profiles: {
+        Row: {
+          id: string
+          email: string
+          full_name: string | null
+          avatar_url: string | null
+          created_at: string
+        }
+        Insert: {
+          id: string
+          email: string
+          full_name?: string | null
+          avatar_url?: string | null
           created_at?: string
         }
         Update: {
           id?: string
-          card_id?: string
-          viewer_ip?: string
-          device_info?: string
+          email?: string
+          full_name?: string | null
+          avatar_url?: string | null
+          created_at?: string
+        }
+      }
+      templates: {
+        Row: {
+          id: string
+          name: string
+          theme: string
+          preview_url: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          theme: string
+          preview_url: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          theme?: string
+          preview_url?: string
           created_at?: string
         }
       }
@@ -153,6 +200,9 @@ export interface Database {
       [_ in never]: never
     }
     Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
       [_ in never]: never
     }
   }

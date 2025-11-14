@@ -19,21 +19,27 @@ export const Hero = () => {
             พร้อม QR Code, Analytics และการจัดการที่ง่ายดาย
           </p>
 
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <Link
-              href="/auth/login"
-              className="btn-primary text-lg px-8 py-4 flex items-center justify-center gap-2"
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12 relative z-10">
+            <button
+              className="btn-primary text-lg px-8 py-4 flex items-center justify-center gap-2 cursor-pointer relative z-20"
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.href = '/auth/login';
+              }}
             >
               เริ่มต้นใช้งาน
               <ArrowRight className="w-5 h-5" />
-            </Link>
+            </button>
             
-            <Link
-              href="/demo"
-              className="btn-secondary text-lg px-8 py-4"
+            <button
+              className="btn-secondary text-lg px-8 py-4 cursor-pointer relative z-20"
+              onClick={(e) => {
+                e.preventDefault();
+                window.location.href = '/demo';
+              }}
             >
               ดูตัวอย่าง
-            </Link>
+            </button>
           </div>
 
           {/* Features Preview */}
@@ -78,7 +84,7 @@ export const Hero = () => {
       </div>
 
       {/* Background Pattern */}
-      <div className="absolute inset-0 overflow-hidden">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-32 w-80 h-80 bg-primary-200 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
         <div className="absolute -bottom-40 -left-32 w-80 h-80 bg-primary-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
       </div>

@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "e-BizCard",
-    "slug": "ebizcard-mobile",
+    "slug": "ebizcard",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,21 +16,42 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ebizcard.mobile"
+      "bundleIdentifier": "com.ebizcard.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#ffffff"
       },
-      "package": "com.ebizcard.mobile"
+      "package": "com.ebizcard.app"
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-camera",
-      "expo-barcode-scanner"
-    ]
+      "expo-router",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "13.0"
+          },
+          "android": {
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "buildToolsVersion": "34.0.0"
+          }
+        }
+      ]
+    ],
+    "scheme": "ebizcard",
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    }
   }
 }

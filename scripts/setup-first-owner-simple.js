@@ -1,0 +1,154 @@
+// Simple setup script that prompts for environment variables
+const { createClient } = require('@supabase/supabase-js');
+
+async function setupFirstOwner() {
+  const email = process.argv[2];
+  
+  if (!email) {
+    console.error('❌ Please provide an email address');
+    console.log('Usage: node scripts/setup-first-owner-simple.js <email>');
+    console.log('');
+    console.log('You will be prompted to enter your Supabase credentials.');
+    process.exit(1);
+  }
+
+  // Get environment variables from command line arguments or prompt
+  const supabaseUrl = process.argv[3] || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.argv[4] || process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    console.error('❌ Missing required Supabase credentials');
+    console.error('');
+    console.error('Please provide them as arguments:');
+    console.error('Usage: node scripts/setup-first-owner-simple.js <email> <supabase-url> <service-role-key>');
+    console.error('');
+    console.error('Or set environment variables:');
+    console.error('  NEXT_PUBLIC_SUPABASE_URL=your-supabase-url');
+    console.error('  SUPABASE_SERVICE_ROLE_KEY=your-service-role-key');
+    process.exit(1);
+  }
+
+  console.log('🔗 Connecting to Supabase...');
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  try {
+    console.log(`🔍 Looking for user with email: ${email}`);
+    
+    // First, get the user from auth.users using the admin client
+    const { data: users, error: authError } = await supabase.auth.admin.listUsers();
+    
+    if (authError) {
+      console.error('❌ Error fetching users:', authError.message);
+      process.exit(1);
+    }
+
+    // Find user by email
+    const authUser = users.users.find(user => user.email === email);
+
+    if (!authUser) {
+      console.error('❌ User not found with email:', email);
+      console.error('');
+      console.error('Please make sure:');
+      console.error('1. The user has registered an account');
+      console.error('2. The email address is correct');
+      console.error('3. The user has verified their email (if email verification is enabled)');
+      process.exit(1);
+    }
+
+    console.log(`✅ Found user: ${authUser.email} (ID: ${authUser.id})`);
+
+    // Check if user has a profile
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authUser.id)
+      .single();
+
+    if (profileError && profileError.code !== 'PGRST116') {
+      console.error('❌ Error checking profile:', profileError.message);
+      process.exit(1);
+    }
+
+    if (!profile) {
+      console.log('📝 Creating profile for user...');
+      
+      const { error: createError } = await supabase
+        .from('profiles')
+        .insert({
+          id: authUser.id,
+          email: authUser.email,
+          full_name: authUser.user_metadata?.full_name || '',
+          user_type: 'owner',
+          is_active: true,
+          created_at: new Date().toISOString()
+        });
+
+      if (createError) {
+        console.error('❌ Error creating profile:', createError.message);
+        process.exit(1);
+      }
+    } else {
+      console.log('📝 Updating existing profile to owner...');
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          user_type: 'owner',
+          is_active: true,
+          role_updated_at: new Date().toISOString()
+        })
+        .eq('id', authUser.id);
+
+      if (updateError) {
+        console.error('❌ Error updating profile:', updateError.message);
+        process.exit(1);
+      }
+    }
+
+    // Try to log the role change (optional)
+    try {
+      const { error: auditError } = await supabase
+        .from('role_changes')
+        .insert({
+          user_id: authUser.id,
+          old_role: profile?.user_type || 'user',
+          new_role: 'owner',
+          changed_by: authUser.id,
+          reason: 'Initial owner setup'
+        });
+
+      if (auditError) {
+        console.warn('⚠️ Warning: Could not log role change (this is okay):', auditError.message);
+      } else {
+        console.log('📋 Role change logged successfully');
+      }
+    } catch (auditError) {
+      console.warn('⚠️ Warning: Could not log role change (this is okay)');
+    }
+
+    console.log('');
+    console.log('🎉 Successfully set user as owner!');
+    console.log(`📧 Email: ${email}`);
+    console.log(`🆔 User ID: ${authUser.id}`);
+    console.log(`👑 Role: Owner`);
+    console.log('');
+    console.log('🔐 This user now has full administrative privileges and can:');
+    console.log('   - Manage other users\' roles');
+    console.log('   - Access admin dashboard at /admin/users');
+    console.log('   - Perform all administrative actions');
+    console.log('');
+    console.log('✅ Setup complete! You can now log in as this user and access the admin panel.');
+
+  } catch (error) {
+    console.error('❌ Unexpected error:', error.message);
+    console.error('');
+    console.error('Common issues:');
+    console.error('1. Check your Supabase URL and Service Role Key');
+    console.error('2. Make sure the user has registered and verified their email');
+    console.error('3. Check your database connection');
+    process.exit(1);
+  }
+}
+
+// Run the script
+setupFirstOwner();

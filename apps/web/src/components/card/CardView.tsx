@@ -1,155 +1,224 @@
 'use client';
 
-import React from 'react';
-import { Download, Phone, Mail, MapPin, Globe, Linkedin, Twitter, Github } from 'lucide-react';
-import { BusinessCard } from '@/types';
-import { generateVCard, downloadVCard } from '@/utils/vCard';
+import React, { useState } from 'react';
+import { 
+  Phone, 
+  Mail, 
+  MapPin, 
+  Globe, 
+  Linkedin, 
+  Twitter, 
+  Facebook,
+  Download,
+  Share2
+} from 'lucide-react';
+
+interface BusinessCard {
+  id: string;
+  name: string;
+  job_title?: string;
+  company?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  social_links?: {
+    website?: string;
+    linkedin?: string;
+    twitter?: string;
+    facebook?: string;
+  };
+  theme?: string;
+  created_at: string;
+  updated_at: string;
+}
 
 interface CardViewProps {
   card: BusinessCard;
 }
 
-export const CardView: React.FC<CardViewProps> = ({ card }) => {
-  const socialLinks = card.social_links as any || {};
+export const CardView = ({ card }: CardViewProps) => {
+  const [isDownloadingVCard, setIsDownloadingVCard] = useState(false);
+
+  const socialLinks = card.social_links || {};
 
   const handleDownloadVCard = async () => {
+    // Check if card has an ID (saved to database)
+    if (!card.id || card.id === 'undefined' || card.id.startsWith('demo-')) {
+      alert('กรุณาบันทึกนามบัตรก่อนดาวน์โหลด vCard');
+      return;
+    }
+
+    setIsDownloadingVCard(true);
     try {
-      await downloadVCard(card);
+      const response = await fetch('/api/generate-vcard', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cardId: card.id }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to generate vCard');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${card.name.replace(/\s+/g, '_')}.vcf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading vCard:', error);
+      alert('ไม่สามารถดาวน์โหลด vCard ได้');
+    } finally {
+      setIsDownloadingVCard(false);
     }
   };
 
+  const handleShare = async () => {
+    // Check if card has an ID (saved to database)
+    if (!card.id || card.id === 'undefined' || card.id.startsWith('demo-')) {
+      alert('กรุณาบันทึกนามบัตรก่อนแชร์');
+      return;
+    }
+
+    // Use the same share functionality as Dashboard
+    const url = `${window.location.origin}/card/${card.id}`;
+    
+    // Check if Web Share API is supported
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: `นามบัตรดิจิทัล - ${card.name}`,
+          text: `ดูนามบัตรดิจิทัลของ ${card.name}`,
+          url: url,
+        });
+      } catch (error) {
+        console.log('Error sharing:', error);
+        // If share was cancelled or failed, fallback to copy link
+        navigator.clipboard.writeText(url);
+        alert('คัดลอกลิงก์เรียบร้อยแล้ว');
+      }
+    } else {
+      // Fallback to copying URL
+      navigator.clipboard.writeText(url);
+      alert('คัดลอกลิงก์เรียบร้อยแล้ว');
+    }
+  };
+
+  const handleCall = () => {
+    if (card.phone) {
+      window.open(`tel:${card.phone}`, '_self');
+    }
+  };
+
+  const handleEmail = () => {
+    if (card.email) {
+      window.open(`mailto:${card.email}`, '_self');
+    }
+  };
+
+  const handleWebsite = (url: string) => {
+    window.open(url, '_blank');
+  };
+
   return (
-    <div className="max-w-2xl mx-auto">
-      {/* Card Container */}
-      <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-primary-500 to-primary-600 px-8 py-12 text-white">
-          <div className="text-center">
-            <div className="w-24 h-24 bg-white/20 rounded-full mx-auto mb-4 flex items-center justify-center">
-              <span className="text-3xl font-bold text-white">
-                {card.name.charAt(0).toUpperCase()}
-              </span>
-            </div>
-            <h1 className="text-3xl font-bold mb-2">{card.name}</h1>
-            {card.job_title && (
-              <p className="text-xl text-primary-100 mb-1">{card.job_title}</p>
-            )}
-            {card.company && (
-              <p className="text-lg text-primary-200">{card.company}</p>
-            )}
-          </div>
+    <div className="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+      {/* Card Header */}
+      <div className="bg-gradient-to-br from-primary-500 to-primary-600 px-8 py-12 text-center">
+        <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
+          <span className="text-4xl font-bold text-white">
+            {card.name.charAt(0).toUpperCase()}
+          </span>
         </div>
+        <h1 className="text-2xl font-bold text-white mb-2">{card.name}</h1>
+        {card.job_title && (
+          <p className="text-primary-100 text-lg">{card.job_title}</p>
+        )}
+        {card.company && (
+          <p className="text-primary-200 text-sm">{card.company}</p>
+        )}
+      </div>
 
-        {/* Content */}
-        <div className="p-8">
-          {/* Contact Information */}
-          <div className="space-y-4 mb-8">
-            {card.phone && (
-              <div className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-gray-500" />
-                <a 
-                  href={`tel:${card.phone}`}
-                  className="text-gray-700 hover:text-primary-500 transition-colors"
-                >
-                  {card.phone}
-                </a>
-              </div>
-            )}
-            
-            {card.email && (
-              <div className="flex items-center gap-3">
-                <Mail className="w-5 h-5 text-gray-500" />
-                <a 
-                  href={`mailto:${card.email}`}
-                  className="text-gray-700 hover:text-primary-500 transition-colors"
-                >
-                  {card.email}
-                </a>
-              </div>
-            )}
-            
-            {card.address && (
-              <div className="flex items-center gap-3">
-                <MapPin className="w-5 h-5 text-gray-500" />
-                <span className="text-gray-700">{card.address}</span>
-              </div>
-            )}
+      {/* Contact Information */}
+      <div className="p-6 space-y-4">
+        {card.phone && (
+          <button
+            onClick={handleCall}
+            className="w-full flex items-center p-3 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Phone className="w-5 h-5 text-primary-500 mr-3" />
+            <span className="text-gray-900">{card.phone}</span>
+          </button>
+        )}
+
+        {card.email && (
+          <button
+            onClick={handleEmail}
+            className="w-full flex items-center p-3 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Mail className="w-5 h-5 text-primary-500 mr-3" />
+            <span className="text-gray-900">{card.email}</span>
+          </button>
+        )}
+
+        {card.address && (
+          <div className="flex items-start p-3 rounded-lg">
+            <MapPin className="w-5 h-5 text-primary-500 mr-3 mt-0.5" />
+            <span className="text-gray-900">{card.address}</span>
           </div>
+        )}
 
-          {/* Social Links */}
-          {(socialLinks.website || socialLinks.linkedin || socialLinks.twitter || socialLinks.github) && (
-            <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">ติดตามฉัน</h3>
-              <div className="flex flex-wrap gap-4">
-                {socialLinks.website && (
-                  <a
-                    href={socialLinks.website}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-primary-500 hover:text-primary-600 transition-colors"
-                  >
-                    <Globe className="w-5 h-5" />
-                    เว็บไซต์
-                  </a>
-                )}
-                
-                {socialLinks.linkedin && (
-                  <a
-                    href={socialLinks.linkedin}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 transition-colors"
-                  >
-                    <Linkedin className="w-5 h-5" />
-                    LinkedIn
-                  </a>
-                )}
-                
-                {socialLinks.twitter && (
-                  <a
-                    href={socialLinks.twitter}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-blue-400 hover:text-blue-500 transition-colors"
-                  >
-                    <Twitter className="w-5 h-5" />
-                    Twitter
-                  </a>
-                )}
-                
-                {socialLinks.github && (
-                  <a
-                    href={socialLinks.github}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-gray-700 hover:text-gray-800 transition-colors"
-                  >
-                    <Github className="w-5 h-5" />
-                    GitHub
-                  </a>
-                )}
-              </div>
-            </div>
-          )}
+        {/* Social Links */}
+        {Object.entries(socialLinks).map(([platform, url]) => {
+          if (!url) return null;
 
-          {/* Download Button */}
-          <div className="pt-6 border-t border-gray-200">
+          const iconMap: { [key: string]: React.ComponentType<any> } = {
+            website: Globe,
+            linkedin: Linkedin,
+            twitter: Twitter,
+            facebook: Facebook,
+          };
+
+          const Icon = iconMap[platform] || Globe;
+
+          return (
+            <button
+              key={platform}
+              onClick={() => handleWebsite(url)}
+              className="w-full flex items-center p-3 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Icon className="w-5 h-5 text-primary-500 mr-3" />
+              <span className="text-gray-900 capitalize">{platform}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="px-6 pb-6">
+        <div className="border-t border-gray-200 pt-6">
+          <div className="grid grid-cols-2 gap-3">
             <button
               onClick={handleDownloadVCard}
-              className="w-full btn-primary flex items-center justify-center gap-2"
+              disabled={isDownloadingVCard}
+              className="bg-green-500 text-white py-3 px-4 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 flex items-center justify-center text-sm"
             >
-              <Download className="w-5 h-5" />
-              บันทึกเป็น Contact
+              <Download className="w-4 h-4 mr-2" />
+              {isDownloadingVCard ? 'กำลังดาวน์โหลด...' : 'ดาวน์โหลด vCard'}
+            </button>
+
+            <button
+              onClick={handleShare}
+              className="bg-gray-500 text-white py-3 px-4 rounded-lg hover:bg-gray-600 transition-colors flex items-center justify-center text-sm"
+            >
+              <Share2 className="w-4 h-4 mr-2" />
+              แชร์นามบัตร
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Footer */}
-      <div className="text-center mt-8 text-gray-500 text-sm">
-        <p>สร้างด้วย e-BizCard - นามบัตรดิจิทัล</p>
       </div>
     </div>
   );

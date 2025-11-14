@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Session Clear</title>
+    <style>
+        body { font-family: Arial; padding: 20px; }
+        button { background: #dc2626; color: white; border: none; padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d1fae5; }
+        .error { background: #fee2e2; }
+        .info { background: #dbeafe; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Session Clear</h1>
+    <div id="status" class="status info">Loading...</div>
+    <button onclick="testLogout()">Test Logout</button>
+    <button onclick="checkStatus()">Check Status</button>
+    <button onclick="goToApp()">Go to App</button>
+    
+    <script>
+        function checkStatus() {
+            const user = localStorage.getItem('user');
+            const session = sessionStorage.getItem('supabase.auth.token');
+            const status = document.getElementById('status');
+            
+            if (user) {
+                try {
+                    const userData = JSON.parse(user);
+                    status.className = 'status success';
+                    status.textContent = `✅ User logged in: ${userData.email || 'Unknown'}`;
+                } catch (e) {
+                    status.className = 'status error';
+                    status.textContent = '❌ Invalid user data';
+                }
+            } else {
+                status.className = 'status info';
+                status.textContent = 'ℹ️ No user logged in';
+            }
+            
+            console.log('LocalStorage:', localStorage);
+            console.log('SessionStorage:', sessionStorage);
+            console.log('Cookies:', document.cookie);
+        }
+        
+        function testLogout() {
+            console.log('🧪 Testing logout...');
+            
+            // Clear all storage
+            localStorage.clear();
+            sessionStorage.clear();
+            
+            // Clear all cookies
+            document.cookie.split(";").forEach(function(c) { 
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+            });
+            
+            // Clear IndexedDB if exists
+            if ('indexedDB' in window) {
+                try {
+                    indexedDB.deleteDatabase('supabase');
+                    console.log('🧪 Cleared IndexedDB');
+                } catch (e) {
+                    console.log('🧪 Could not clear IndexedDB:', e);
+                }
+            }
+            
+            console.log('🧪 Cleared all storage and session');
+            checkStatus();
+            
+            console.log('🧪 Redirecting to home...');
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1000);
+        }
+        
+        function goToApp() {
+            window.location.href = '/';
+        }
+        
+        checkStatus();
+        console.log('🧪 Test page loaded');
+    </script>
+</body>
+</html>

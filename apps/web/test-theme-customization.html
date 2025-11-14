@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme Customization Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: #3b82f6;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .content {
+            padding: 20px;
+        }
+        .success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .info {
+            background: #dbeafe;
+            border: 1px solid #3b82f6;
+            color: #1e40af;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+        .code {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            overflow-x: auto;
+        }
+        .button {
+            background: #3b82f6;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background: #2563eb;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎨 Theme Customization Page</h1>
+            <p>หน้าเว็บสำหรับสร้างและแก้ไข template นามบัตร</p>
+        </div>
+        
+        <div class="content">
+            <div class="success">
+                <h3>✅ สร้างเสร็จแล้ว!</h3>
+                <p>หน้า Theme Customization ได้ถูกสร้างเรียบร้อยแล้ว พร้อมใช้งาน</p>
+            </div>
+
+            <div class="info">
+                <h3>📋 คุณสมบัติที่สร้างแล้ว:</h3>
+                <ul>
+                    <li>✅ 2 Tabs: สร้าง Template และ Template ที่มี</li>
+                    <li>✅ Canvas area พร้อม drag & drop</li>
+                    <li>✅ Right panel สำหรับ settings และ elements</li>
+                    <li>✅ Property panel สำหรับแก้ไข properties</li>
+                    <li>✅ รองรับ Text, Text Area, Logo elements</li>
+                    <li>✅ Data binding กับ fields ต่างๆ</li>
+                    <li>✅ ตั้งค่าหน้ากระดาษ (A4, A5, Custom)</li>
+                    <li>✅ ตั้งค่า background (สี/รูปภาพ)</li>
+                    <li>✅ Color picker สำหรับเลือกสี</li>
+                    <li>✅ Move/resize/delete elements</li>
+                </ul>
+            </div>
+
+            <div class="info">
+                <h3>🚀 วิธีใช้งาน:</h3>
+                <ol>
+                    <li>ไปที่ <code>/theme-customization</code></li>
+                    <li>เลือก tab "สร้าง Template นามบัตร"</li>
+                    <li>ตั้งค่าหน้ากระดาษใน Right Panel</li>
+                    <li>ลาก elements จาก panel มาวางใน canvas</li>
+                    <li>คลิก element เพื่อเปิด Property Panel</li>
+                    <li>ตั้งค่า properties และ field binding</li>
+                    <li>กด Save Template</li>
+                </ol>
+            </div>
+
+            <div class="code">
+                <h4>📁 ไฟล์ที่สร้าง:</h4>
+                <pre>
+src/app/theme-customization/page.tsx
+src/components/theme-customization/Canvas.tsx
+src/components/theme-customization/DraggableElement.tsx
+src/components/theme-customization/RightPanel.tsx
+src/components/theme-customization/PropertyPanel.tsx
+src/components/theme-customization/DraggableItem.tsx
+src/types/theme-customization.ts
+THEME_CUSTOMIZATION_README.md
+                </pre>
+            </div>
+
+            <div class="code">
+                <h4>📦 Dependencies ที่เพิ่ม:</h4>
+                <pre>
+@dnd-kit/core: ^6.0.8
+@dnd-kit/sortable: ^7.0.2
+@dnd-kit/utilities: ^3.2.1
+react-colorful: ^5.6.1
+                </pre>
+            </div>
+
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="/theme-customization" class="button">🎨 เปิด Theme Customization</a>
+                <a href="/" class="button">🏠 กลับหน้าแรก</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

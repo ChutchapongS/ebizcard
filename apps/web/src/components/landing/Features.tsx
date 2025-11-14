@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Smartphone, 
   QrCode, 
@@ -12,79 +12,148 @@ import {
   Zap
 } from 'lucide-react';
 
-const features = [
+interface FeatureItem {
+  id: string;
+  title: string;
+  description: string;
+  icon_url?: string;
+}
+
+// Default fallback icons
+const defaultIcons: Record<string, any> = {
+  'Multi-Platform': Smartphone,
+  'QR Code Generation': QrCode,
+  'vCard Export': Download,
+  'Analytics': BarChart3,
+  'Contact Management': Users,
+  'Customizable Templates': Palette,
+  'Secure & Private': Shield,
+  'Real-time Updates': Zap,
+};
+
+const defaultFeatures: FeatureItem[] = [
   {
-    icon: Smartphone,
+    id: 'feature-1',
     title: 'Multi-Platform',
-    description: 'ใช้งานได้ทั้งบนมือถือ (iOS/Android) และเว็บไซต์ พร้อม PWA support'
+    description: 'ใช้งานได้ทั้งบนมือถือ (iOS/Android) และเว็บไซต์ พร้อม PWA support',
   },
   {
-    icon: QrCode,
+    id: 'feature-2',
     title: 'QR Code Generation',
-    description: 'สร้าง QR Code สำหรับแชร์นามบัตรได้ทันที พร้อมการติดตาม'
+    description: 'สร้าง QR Code สำหรับแชร์นามบัตรได้ทันที พร้อมการติดตาม',
   },
   {
-    icon: Download,
+    id: 'feature-3',
     title: 'vCard Export',
-    description: 'ดาวน์โหลดนามบัตรเป็นไฟล์ .vcf เพื่อเพิ่มใน Contact'
+    description: 'ดาวน์โหลดนามบัตรเป็นไฟล์ .vcf เพื่อเพิ่มใน Contact',
   },
   {
-    icon: BarChart3,
+    id: 'feature-4',
     title: 'Analytics',
-    description: 'ติดตามการดูนามบัตร จำนวนการสแกน QR และข้อมูลผู้เยี่ยมชม'
+    description: 'ติดตามการดูนามบัตร จำนวนการสแกน QR และข้อมูลผู้เยี่ยมชม',
   },
-  {
-    icon: Users,
-    title: 'Contact Management',
-    description: 'จัดการรายชื่อผู้ติดต่อที่สแกน QR Code ของคุณ'
-  },
-  {
-    icon: Palette,
-    title: 'Customizable Templates',
-    description: 'เลือกธีมสำเร็จรูปหรือปรับแต่งสีและรูปแบบตามต้องการ'
-  },
-  {
-    icon: Shield,
-    title: 'Secure & Private',
-    description: 'ข้อมูลปลอดภัยด้วย Supabase และ Row Level Security'
-  },
-  {
-    icon: Zap,
-    title: 'Real-time Updates',
-    description: 'อัปเดตข้อมูลแบบ real-time พร้อมการแจ้งเตือน'
-  }
 ];
 
 export const Features = () => {
+  const [featuresTitle, setFeaturesTitle] = useState<string>('ฟีเจอร์ครบครัน');
+  const [featuresDescription, setFeaturesDescription] = useState<string>(
+    'ทุกสิ่งที่คุณต้องการสำหรับการสร้างและจัดการนามบัตรดิจิทัล'
+  );
+  const [features, setFeatures] = useState<FeatureItem[]>(defaultFeatures);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch('/api/admin/web-settings');
+        if (!response.ok) {
+          throw new Error('Failed to load settings');
+        }
+        const data = await response.json();
+        
+        if (data.success && data.settings) {
+          if (data.settings.features_title) {
+            setFeaturesTitle(data.settings.features_title);
+          }
+          if (data.settings.features_description) {
+            setFeaturesDescription(data.settings.features_description);
+          }
+          
+          // Load features items
+          if (data.settings.features_items) {
+            try {
+              const featuresRaw = data.settings.features_items;
+              const parsed = typeof featuresRaw === 'string' ? JSON.parse(featuresRaw) : featuresRaw;
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                setFeatures(parsed);
+              }
+            } catch (error) {
+              console.error('Error parsing features items:', error);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to fetch features settings', error);
+      }
+    };
+
+    fetchSettings();
+
+    // Listen for settings updates
+    const handleSettingsUpdate = () => {
+      fetchSettings();
+    };
+
+    window.addEventListener('webSettingsUpdated', handleSettingsUpdate);
+
+    return () => {
+      window.removeEventListener('webSettingsUpdated', handleSettingsUpdate);
+    };
+  }, []);
+
   return (
     <div className="py-20 bg-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            ฟีเจอร์ครบครัน
+            {featuresTitle}
           </h2>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            ทุกสิ่งที่คุณต้องการสำหรับการสร้างและจัดการนามบัตรดิจิทัล
-          </p>
+          {featuresDescription && (
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              {featuresDescription}
+            </p>
+          )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {features.map((feature, index) => (
-            <div
-              key={index}
-              className="text-center p-6 rounded-lg hover:shadow-lg transition-shadow duration-300"
-            >
-              <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                <feature.icon className="w-6 h-6 text-primary-600" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
+          {features.map((feature, index) => {
+            const DefaultIcon = defaultIcons[feature.title];
+            return (
+              <div
+                key={feature.id || index}
+                className="text-center p-5 sm:p-6 rounded-lg hover:shadow-lg transition-shadow duration-300 bg-white h-full flex flex-col items-center"
+              >
+                <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
+                  {feature.icon_url ? (
+                    <img
+                      src={feature.icon_url}
+                      alt={feature.title}
+                      className="w-6 h-6 object-contain"
+                    />
+                  ) : DefaultIcon ? (
+                    <DefaultIcon className="w-6 h-6 text-primary-600" />
+                  ) : (
+                    <Smartphone className="w-6 h-6 text-primary-600" />
+                  )}
+                </div>
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-0 sm:mb-2">
+                  {feature.title}
+                </h3>
+                <p className="hidden sm:block text-gray-600 text-sm">
+                  {feature.description}
+                </p>
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                {feature.title}
-              </h3>
-              <p className="text-gray-600 text-sm">
-                {feature.description}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
