@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit, RATE_LIMIT_CONFIGS, addRateLimitHeaders } from '@/lib/rate-limit';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting (standard for QR code generation)
+  const rateLimitResponse = rateLimit(request, RATE_LIMIT_CONFIGS.standard);
+  if (rateLimitResponse) return rateLimitResponse;
   try {
     const { cardId } = await request.json();
 
@@ -60,11 +64,12 @@ export async function POST(request: NextRequest) {
         }
       });
 
-      return NextResponse.json({
+      const response = NextResponse.json({
         success: true,
         qrCode: qrCodeDataUrl,
         publicUrl: publicUrl
       });
+      return addRateLimitHeaders(response, request);
     } catch (qrError) {
       console.error('QR Code generation error:', qrError);
       return NextResponse.json(

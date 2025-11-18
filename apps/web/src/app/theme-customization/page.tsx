@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core';
 import { Navbar } from '@/components/layout/Navbar';
 import { Canvas } from '@/components/theme-customization/Canvas';
@@ -14,7 +14,8 @@ import { createUserData, UserData } from '@/utils/userDataUtils';
 import { Edit, Trash2, Eye, Copy, Plus, Save } from 'lucide-react';
 
 export default function ThemeCustomizationPage() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, isLoading } = useAuth();
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'create' | 'templates'>('create');
   const [selectedElement, setSelectedElement] = useState<CanvasElement | null>(null);
@@ -70,6 +71,10 @@ export default function ThemeCustomizationPage() {
   const [userTemplatesCount, setUserTemplatesCount] = useState<number>(0);
   const [isLoadingUserData, setIsLoadingUserData] = useState<boolean>(false);
   
+  // Track last fetch time to prevent rapid successive calls
+  const lastFetchTimeRef = useRef<number>(0);
+  const fetchCooldown = 5000; // 5 seconds cooldown between fetches
+  
   // Search state
   const [searchQuery, setSearchQuery] = useState<string>('');
   
@@ -83,6 +88,159 @@ export default function ThemeCustomizationPage() {
   // Delete template confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [templateToDelete, setTemplateToDelete] = useState<{ id: string; name: string; cards: any[] } | null>(null);
+
+  // Helper: reset Create/Edit tab to initial state
+  const resetCreateTabState = useCallback(() => {
+    setElements([]);
+    setPaperSettings({
+      size: 'Business Card (L)',
+      width: 180,
+      height: 110,
+      orientation: 'portrait',
+      background: {
+        type: 'color',
+        color: '#ffffff',
+        gradient: {
+          type: 'base',
+          colors: ['#ffffff'],
+          direction: 'horizontal'
+        }
+      }
+    });
+    setSelectedElement(null);
+    setEditingTemplateId(null);
+    setEditingTemplateName('');
+    setHasUnsavedChanges(false);
+    setUseAddressPrefix(true);
+    setSavedGradientColors(['#ffffff', '#ffffff', '#ffffff']);
+    setSavedGradientDirection('horizontal');
+  }, []);
+
+  // Load user data function
+  const loadUserData = useCallback(async () => {
+      // Check cooldown period to prevent rapid successive calls
+      const now = Date.now();
+      const timeSinceLastFetch = now - lastFetchTimeRef.current;
+      
+      if (timeSinceLastFetch < fetchCooldown) {
+        console.log(`⏳ Skipping fetch - cooldown active (${Math.ceil((fetchCooldown - timeSinceLastFetch) / 1000)}s remaining)`);
+        return;
+      }
+      
+      if (user && !isLoadingUserData) { // Prevent multiple simultaneous calls
+        try {
+          setIsLoadingUserData(true);
+          lastFetchTimeRef.current = now; // Update last fetch time
+          
+          // ใช้ API เดียวกันกับหน้า Settings
+          console.log('🔄 Fetching profile data via /api/get-profile');
+          
+          const { supabase } = await import('@/lib/supabase/client');
+          const { data: { session } } = await supabase!.auth.getSession();
+          
+          if (!session?.access_token) {
+            console.warn('No session token');
+            setIsLoadingUserData(false);
+            return;
+          }
+          
+          const response = await fetch('/api/get-profile', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              access_token: session.access_token,
+            }),
+          });
+          
+          const result = await response.json();
+          console.log('🔄 Profile response:', result);
+          
+          // Handle rate limit error
+          if (response.status === 429) {
+            console.warn('⚠️ Rate limit exceeded, will retry after cooldown');
+            // Extend cooldown period when rate limited
+            const retryAfter = result.retryAfter || 30;
+            lastFetchTimeRef.current = now - (fetchCooldown - retryAfter * 1000);
+            return;
+          }
+          
+          if (result.success && result.profile) {
+            const profile = result.profile;
+              console.log('Profile data from Supabase:', profile);
+              console.log('📍 Addresses from profile:', profile.addresses);
+              
+              // Set current user role for permission checking
+              setCurrentUserRole(profile.user_type || 'user');
+              
+              // Set user plan based on user_type and user_plan from profiles table
+              let plan = 'Free';
+              if (profile.user_type === 'admin' || profile.user_type === 'owner') {
+                plan = 'Pro'; // Admin and Owner get Pro plan
+              } else if (profile.user_plan) {
+                plan = profile.user_plan; // Use user_plan from profiles table
+              } else if (profile.subscription_level) {
+                plan = profile.subscription_level; // Fallback to subscription_level
+              }
+              
+              // Only update if plan has changed
+              if (plan !== userPlan) {
+                setUserPlan(plan);
+                
+                // Reload templates to get updated count (without page reload)
+              }
+              
+              // Addresses มาจาก /api/get-profile แล้ว
+              const addressesList = profile.addresses || [];
+              let addressData = '';
+              
+              if (addressesList.length > 0) {
+                const primaryAddress = addressesList.find((addr: any) => addr.is_primary) || addressesList[0];
+                addressData = `${primaryAddress.address}, ${primaryAddress.district}, ${primaryAddress.province} ${primaryAddress.postalCode || ''}`.trim();
+                console.log('📍 Address data:', addressData);
+              }
+              
+              const userDataToSet = createUserData(profile, user, addressesList);
+              
+              console.log('🖼️ Setting userData with image data:', {
+                avatar_url: userDataToSet.avatar_url,
+                company_logo: userDataToSet.user_metadata.company_logo,
+                profile_avatar_url: profile.avatar_url,
+                user_avatar_url: user.user_metadata?.avatar_url
+              });
+              
+              console.log('📍 Address data debug:', {
+                addressesList: addressesList,
+                addressesLength: addressesList.length,
+                personal_address_1_id: profile.personal_address_1_id,
+                personal_address_2_id: profile.personal_address_2_id,
+                work_address_1_id: profile.work_address_1_id,
+                work_address_2_id: profile.work_address_2_id
+              });
+              
+              // เพิ่ม addresses array ลงใน userDataToSet
+              userDataToSet.addresses = addressesList;
+              
+              setUserData(userDataToSet);
+              return;
+            }
+          
+          console.warn('⚠️ No profile data found');
+        } catch (error) {
+          console.error('Error loading profile data:', error);
+        } finally {
+          setIsLoadingUserData(false);
+        }
+      }
+    }, [user, userPlan]);
+
+  // Check authentication and redirect if not logged in
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push('/auth/login');
+    }
+  }, [user, isLoading, router]);
 
   // Load level capabilities
   useEffect(() => {
@@ -189,33 +347,6 @@ export default function ThemeCustomizationPage() {
     }
   }, []);
 
-  // Helper: reset Create/Edit tab to initial state
-  const resetCreateTabState = useCallback(() => {
-    setElements([]);
-    setPaperSettings({
-      size: 'Business Card (L)',
-      width: 180,
-      height: 110,
-      orientation: 'portrait',
-      background: {
-        type: 'color',
-        color: '#ffffff',
-        gradient: {
-          type: 'base',
-          colors: ['#ffffff'],
-          direction: 'horizontal'
-        }
-      }
-    });
-    setSelectedElement(null);
-    setEditingTemplateId(null);
-    setEditingTemplateName('');
-    setHasUnsavedChanges(false);
-    setUseAddressPrefix(true);
-    setSavedGradientColors(['#ffffff', '#ffffff', '#ffffff']);
-    setSavedGradientDirection('horizontal');
-  }, []);
-
   // When user switches back to Create tab, apply reset once if requested
   useEffect(() => {
     if (activeTab === 'create') {
@@ -299,121 +430,38 @@ export default function ThemeCustomizationPage() {
     }
   }, [templates, searchParams]);
 
-  // Load user data function
-  const loadUserData = useCallback(async () => {
-      if (user && !isLoadingUserData) { // Prevent multiple simultaneous calls
-        try {
-          setIsLoadingUserData(true);
-          // ใช้ API เดียวกันกับหน้า Settings
-          console.log('🔄 Fetching profile data via /api/get-profile');
-          
-          const { supabase } = await import('@/lib/supabase/client');
-          const { data: { session } } = await supabase!.auth.getSession();
-          
-          if (!session?.access_token) {
-            console.warn('No session token');
-            return;
-          }
-          
-          const response = await fetch('/api/get-profile', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              access_token: session.access_token,
-            }),
-          });
-          
-          const result = await response.json();
-          console.log('🔄 Profile response:', result);
-          
-          if (result.success && result.profile) {
-            const profile = result.profile;
-              console.log('Profile data from Supabase:', profile);
-              console.log('📍 Addresses from profile:', profile.addresses);
-              
-              // Set current user role for permission checking
-              setCurrentUserRole(profile.user_type || 'user');
-              
-              // Set user plan based on user_type and user_plan from profiles table
-              let plan = 'Free';
-              if (profile.user_type === 'admin' || profile.user_type === 'owner') {
-                plan = 'Pro'; // Admin and Owner get Pro plan
-              } else if (profile.user_plan) {
-                plan = profile.user_plan; // Use user_plan from profiles table
-              } else if (profile.subscription_level) {
-                plan = profile.subscription_level; // Fallback to subscription_level
-              }
-              
-              // Only update if plan has changed
-              if (plan !== userPlan) {
-                setUserPlan(plan);
-                
-                // Reload templates to get updated count (without page reload)
-              }
-              
-              // Addresses มาจาก /api/get-profile แล้ว
-              const addressesList = profile.addresses || [];
-              let addressData = '';
-              
-              if (addressesList.length > 0) {
-                const primaryAddress = addressesList.find((addr: any) => addr.is_primary) || addressesList[0];
-                addressData = `${primaryAddress.address}, ${primaryAddress.district}, ${primaryAddress.province} ${primaryAddress.postalCode || ''}`.trim();
-                console.log('📍 Address data:', addressData);
-              }
-              
-              const userDataToSet = createUserData(profile, user, addressesList);
-              
-              console.log('🖼️ Setting userData with image data:', {
-                avatar_url: userDataToSet.avatar_url,
-                company_logo: userDataToSet.user_metadata.company_logo,
-                profile_avatar_url: profile.avatar_url,
-                user_avatar_url: user.user_metadata?.avatar_url
-              });
-              
-              console.log('📍 Address data debug:', {
-                addressesList: addressesList,
-                addressesLength: addressesList.length,
-                personal_address_1_id: profile.personal_address_1_id,
-                personal_address_2_id: profile.personal_address_2_id,
-                work_address_1_id: profile.work_address_1_id,
-                work_address_2_id: profile.work_address_2_id
-              });
-              
-              // เพิ่ม addresses array ลงใน userDataToSet
-              userDataToSet.addresses = addressesList;
-              
-              setUserData(userDataToSet);
-              return;
-            }
-          
-          console.warn('⚠️ No profile data found');
-        } catch (error) {
-          console.error('Error loading profile data:', error);
-        } finally {
-          setIsLoadingUserData(false);
-        }
-      } else {
-      }
-    }, [user, isLoadingUserData]);
-
   // Load user data when user changes
   useEffect(() => {
+    if (user) {
     loadUserData();
-  }, [user]); // Remove loadUserData from dependencies to prevent infinite loop
+    }
+  }, [user]); // Only depend on user, not loadUserData to prevent loops
 
   // Refresh user data when page becomes visible (e.g., returning from Settings)
+  // Debounced to prevent rapid successive calls
   useEffect(() => {
+    let visibilityTimeout: NodeJS.Timeout;
+    let focusTimeout: NodeJS.Timeout;
+    
     const handleVisibilityChange = () => {
       if (!document.hidden && user) {
+        // Clear any pending timeout
+        clearTimeout(visibilityTimeout);
+        // Debounce the call
+        visibilityTimeout = setTimeout(() => {
         loadUserData();
+        }, 1000); // Wait 1 second after visibility change
       }
     };
 
     const handleFocus = () => {
       if (user) {
+        // Clear any pending timeout
+        clearTimeout(focusTimeout);
+        // Debounce the call
+        focusTimeout = setTimeout(() => {
         loadUserData();
+        }, 1000); // Wait 1 second after focus
       }
     };
 
@@ -421,10 +469,29 @@ export default function ThemeCustomizationPage() {
     window.addEventListener('focus', handleFocus);
 
     return () => {
+      clearTimeout(visibilityTimeout);
+      clearTimeout(focusTimeout);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [user]); // Remove loadUserData from dependencies
+  }, [user, loadUserData]);
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">กำลังโหลด...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render content if user is not authenticated
+  if (!user) {
+    return null;
+  }
 
   const handleDragStart = (event: DragStartEvent) => {
     const { active } = event;

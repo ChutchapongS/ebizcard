@@ -188,14 +188,17 @@ export default function UserManagementTab({ userRole }: UserManagementTabProps) 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="text-xl font-semibold text-gray-900">จัดการผู้ใช้</h2>
           <p className="mt-1 text-sm text-gray-600">
             จัดการสิทธิ์และการเข้าถึงของผู้ใช้ในระบบ
           </p>
+          <div className="mt-2 md:hidden text-sm text-gray-500">
+            ผู้ใช้ทั้งหมด: <span className="font-semibold text-gray-900">{users.length}</span> คน
+          </div>
         </div>
-        <div className="text-sm text-gray-500">
+        <div className="hidden md:block text-sm text-gray-500">
           ผู้ใช้ทั้งหมด: <span className="font-semibold text-gray-900">{users.length}</span> คน
         </div>
       </div>
@@ -212,8 +215,8 @@ export default function UserManagementTab({ userRole }: UserManagementTabProps) 
         </div>
       )}
 
-      {/* Users Table */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      {/* Users Table - Desktop */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -298,6 +301,66 @@ export default function UserManagementTab({ userRole }: UserManagementTabProps) 
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Users Cards - Mobile */}
+      <div className="md:hidden space-y-4">
+        {users.map((userData) => (
+          <div key={userData.id} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+            {/* Header: Name and Email */}
+            <div className="mb-3">
+              <div className="text-base font-semibold text-gray-900 mb-1">
+                {userData.full_name || 'ไม่มีชื่อ'}
+              </div>
+              <div className="text-sm text-gray-500">{userData.email}</div>
+            </div>
+
+            {/* Badges Row */}
+            <div className="flex flex-wrap gap-2 mb-3">
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeColor(userData.user_type)}`}>
+                {getRoleIcon(userData.user_type)}
+                <span className="ml-1 capitalize">
+                  {userData.user_type === 'owner' ? 'เจ้าของ' : 
+                   userData.user_type === 'admin' ? 'ผู้ดูแลระบบ' : 
+                   'ผู้ใช้'}
+                </span>
+              </span>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getPlanBadgeColor(getEffectivePlan(userData.user_type, userData.user_plan), userData.user_type)}`}>
+                {getEffectivePlan(userData.user_type, userData.user_plan)}
+                {userData.user_type === 'admin' || userData.user_type === 'owner' ? (
+                  <span className="ml-1 text-xs">(Admin)</span>
+                ) : null}
+              </span>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                userData.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              }`}>
+                {userData.is_active ? <CheckCircle2 className="w-3 h-3 mr-1" /> : <Ban className="w-3 h-3 mr-1" />}
+                {userData.is_active ? 'ใช้งาน' : 'ปิดการใช้งาน'}
+              </span>
+            </div>
+
+            {/* Dates */}
+            <div className="space-y-1 mb-3 text-sm text-gray-600">
+              <div className="flex justify-between">
+                <span className="text-gray-500">วันที่สมัคร:</span>
+                <span>{new Date(userData.created_at).toLocaleDateString('th-TH')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">อัปเดตล่าสุด:</span>
+                <span>{userData.role_updated_at ? new Date(userData.role_updated_at).toLocaleDateString('th-TH') : '-'}</span>
+              </div>
+            </div>
+
+            {/* Action Button */}
+            <button
+              onClick={() => handleRoleChange(userData)}
+              disabled={userData.id === user?.id}
+              className="w-full mt-3 px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100 disabled:bg-gray-50 disabled:text-gray-400 disabled:border-gray-200 disabled:cursor-not-allowed transition-colors"
+            >
+              เปลี่ยนสิทธิ์
+            </button>
+          </div>
+        ))}
       </div>
 
       {/* Role Change Modal */}

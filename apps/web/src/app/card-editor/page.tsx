@@ -26,7 +26,7 @@ export default function CardEditorPage() {
   // console.log('🎨 CardEditorPage: Component rendered');
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   
   // Load addresses from profile data (same as other pages)
   const [addresses, setAddresses] = useState<any[]>([]);
@@ -117,12 +117,27 @@ export default function CardEditorPage() {
 
   // Set initial mobile preview zoom
   useEffect(() => {
+    // Only apply zoom if template is selected (element exists in DOM)
+    if (!selectedTemplate) return;
+    
+    // Use setTimeout to ensure DOM element is rendered
+    const timer = setTimeout(() => {
     const previewContainer = document.getElementById('mobile-card-editor-preview');
     if (previewContainer) {
       previewContainer.style.transform = `scale(${mobilePreviewZoom / 100})`;
       previewContainer.style.transformOrigin = 'top center';
     }
-  }, [mobilePreviewZoom]);
+    }, 0);
+    
+    return () => clearTimeout(timer);
+  }, [mobilePreviewZoom, selectedTemplate]);
+
+  // Check authentication and redirect if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/auth/login');
+    }
+  }, [user, authLoading, router]);
 
   // Load user data and populate form
   useEffect(() => {
@@ -235,7 +250,7 @@ export default function CardEditorPage() {
 
       // Load addresses from Supabase table (handled by profile data)
     }
-  }, [user]);
+  }, [user, searchParams]);
 
   // Load level capabilities
   useEffect(() => {
@@ -475,26 +490,15 @@ export default function CardEditorPage() {
     }
   }, []);
 
-  useEffect(() => {
-    loadTemplates();
-  }, [loadTemplates]);
-
-  // Listen for template update events to refresh templates
-  useEffect(() => {
-    const handleTemplateUpdate = () => {
-      // Template updated - refreshing templates list
-      loadTemplates();
-    };
+  // Get field value from form data using shared utility
+  const getFieldValue = useCallback((fieldName: string, useAddressPrefix: boolean = true) => {
+    if (!userData) return '';
     
-    // Listen for template update event from theme-customization page
-    window.addEventListener('templateUpdated', handleTemplateUpdate);
-    
-    return () => {
-      window.removeEventListener('templateUpdated', handleTemplateUpdate);
-    };
-  }, [loadTemplates]);
+    // Use shared utility function for consistency
+    return getUserFieldValue(fieldName, userData, useAddressPrefix);
+  }, [userData]);
 
-  // Check for card id/templateId from URL parametersc
+  // Check for card id/templateId from URL parameters
   useEffect(() => {
     const cardId = searchParams.get('id');
     const templateId = searchParams.get('templateId');
@@ -532,9 +536,11 @@ export default function CardEditorPage() {
             if (card.field_values && typeof card.field_values === 'object') {
               const computeOverrides = (tplLocal: any | undefined) => {
                 if (!tplLocal || !tplLocal.elements) return card.field_values || {};
+
                 const overrides: { [key: string]: string } = {};
                 (tplLocal.elements as any[]).forEach((el: any) => {
                   const saved = card.field_values[el.id];
+
                   // Calculate auto value shown in Content column
                   let auto = '';
                   if (el.field) {
@@ -576,6 +582,28 @@ export default function CardEditorPage() {
       }
     }
   }, [templates, searchParams]);
+
+  // Load templates on mount
+  useEffect(() => {
+    loadTemplates();
+  }, [loadTemplates]);
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">กำลังโหลด...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render content if user is not authenticated
+  if (!user) {
+    return null;
+      }
 
   // No auto-select - let user choose template manually
 
@@ -705,14 +733,6 @@ export default function CardEditorPage() {
     };
     
     return iconMap[iconName] || FaStar;
-  };
-
-  // Get field value from form data using shared utility
-  const getFieldValue = (fieldName: string, useAddressPrefix: boolean = true) => {
-    if (!userData) return '';
-    
-    // Use shared utility function for consistency
-    return getUserFieldValue(fieldName, userData, useAddressPrefix);
   };
 
   // Handle field value changes
@@ -1131,7 +1151,20 @@ export default function CardEditorPage() {
       ) : (
         /* Main Content */
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* Step 1: Template Selection */}
+        {/* Show loading state when loading card data */}
+        {isLoading && searchParams.get('id') && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 mb-6">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">กำลังโหลดข้อมูลนามบัตร...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Step 1: Template Selection 
+            - Hide only when editing existing card (has id in URL and formData.id)
+            - Show when creating new card or when coming from template selection (templateId in URL)
+        */}
         {!(formData.id || searchParams.get('id')) && (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 mb-6 sm:mb-8">
           <div className="flex items-center justify-between mb-4">

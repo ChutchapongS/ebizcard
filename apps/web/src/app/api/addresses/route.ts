@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import type { AddressInput, AddressInsert } from '@/types/api';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -72,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     // Then insert new addresses
     if (addresses.length > 0) {
-      const addressesToInsert = addresses.map((address: any) => ({
+      const addressesToInsert: AddressInsert[] = addresses.map((address: AddressInput) => ({
         user_id: userId,
         type: address.type || 'home',
         place: address.place || null,

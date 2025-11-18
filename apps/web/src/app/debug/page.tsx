@@ -3,11 +3,52 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
+import type { User, Session } from '@supabase/supabase-js';
+
+interface AuthLog {
+  event: string;
+  userId?: string;
+  email?: string;
+  expiresAt?: number;
+  timestamp: string;
+}
 
 export default function DebugPage() {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [user, setUser] = useState<any>(null);
-  const [session, setSession] = useState<any>(null);
+  const [isDevelopment, setIsDevelopment] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Check if we're in development mode
+    // In production, NEXT_PUBLIC_NODE_ENV won't be set or will be 'production'
+    const nodeEnv = process.env.NEXT_PUBLIC_NODE_ENV || 
+                    (typeof window !== 'undefined' && window.location.hostname === 'localhost' ? 'development' : 'production');
+    setIsDevelopment(nodeEnv === 'development');
+  }, []);
+
+  // Show loading state while checking
+  if (isDevelopment === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Disable debug page in production
+  if (!isDevelopment) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">Debug Page Not Available</h1>
+          <p className="text-gray-600">This page is only available in development mode.</p>
+        </div>
+      </div>
+    );
+  }
+  const [logs, setLogs] = useState<AuthLog[]>([]);
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
     // Get stored logs

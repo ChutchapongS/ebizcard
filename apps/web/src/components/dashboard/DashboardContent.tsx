@@ -20,6 +20,9 @@ import {
   Facebook,
   TrendingUp,
 } from 'lucide-react';
+import { ErrorMessage } from '@/components/ui/ErrorMessage';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import toast from 'react-hot-toast';
 import { businessCards, supabase, testSupabaseConnection, testDirectConnection, templates as templatesService } from '@/lib/supabase/client';
 import { createUserData, UserData } from '@/utils/userDataUtils';
 import { TemplatePreview } from '@/components/theme-customization/TemplatePreview';
@@ -119,7 +122,7 @@ const CardPreview = ({ card, userProfileData }: { card: BusinessCard; userProfil
   if (isLoading) {
     return (
       <div className="w-full h-48 bg-gray-100 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="md" />
       </div>
     );
   }
@@ -589,7 +592,7 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
 
   const handleDownloadVCardPreview = async () => {
     if (!selectedCard?.id || selectedCard.id === 'undefined' || selectedCard.id.startsWith('demo-')) {
-      alert('กรุณาบันทึกนามบัตรก่อนดาวน์โหลด vCard');
+      toast.error('กรุณาบันทึกนามบัตรก่อนดาวน์โหลด vCard');
       return;
     }
     try {
@@ -625,13 +628,13 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading vCard:', error);
-      alert('ไม่สามารถดาวน์โหลด vCard ได้');
+      toast.error('ไม่สามารถดาวน์โหลด vCard ได้');
     }
   };
 
   const handleDownloadVCard = async (card: BusinessCard) => {
     if (!card?.id || card.id === 'undefined' || card.id.startsWith('demo-')) {
-      alert('กรุณาบันทึกนามบัตรก่อนดาวน์โหลด vCard');
+      toast.error('กรุณาบันทึกนามบัตรก่อนดาวน์โหลด vCard');
       return;
     }
     try {
@@ -665,13 +668,13 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
         message: error.message,
         stack: error.stack
       });
-      alert('ไม่สามารถดาวน์โหลด vCard ได้: ' + (error.message || 'Unknown error'));
+      toast.error('ไม่สามารถดาวน์โหลด vCard ได้: ' + (error.message || 'Unknown error'));
     }
   };
 
   const handleSharePreview = async () => {
     if (!selectedCard?.id || selectedCard.id === 'undefined' || selectedCard.id.startsWith('demo-')) {
-      alert('กรุณาบันทึกนามบัตรก่อนแชร์');
+      toast.error('กรุณาบันทึกนามบัตรก่อนแชร์');
       return;
     }
 
@@ -838,10 +841,10 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
       try {
         await businessCards.delete(cardId);
         setCards(cards.filter(card => card.id !== cardId));
-        alert('ลบนามบัตรเรียบร้อยแล้ว');
+        toast.success('ลบนามบัตรเรียบร้อยแล้ว');
       } catch (error) {
         console.error('Error deleting card:', error);
-        alert('ไม่สามารถลบนามบัตรได้');
+        toast.error('ไม่สามารถลบนามบัตรได้');
       }
     }
   };
@@ -899,7 +902,7 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
   const handleCopyLink = (card: BusinessCard) => {
     const url = `${window.location.origin}/card/${card.id}`;
     navigator.clipboard.writeText(url);
-    alert('คัดลอกลิงก์เรียบร้อยแล้ว');
+    toast.success('คัดลอกลิงก์เรียบร้อยแล้ว');
   };
 
   const downloadQRCodeImage = async () => {
@@ -918,7 +921,7 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading QR code:', error);
-      alert('ไม่สามารถดาวน์โหลด QR Code ได้');
+      toast.error('ไม่สามารถดาวน์โหลด QR Code ได้');
     }
   };
 
@@ -940,7 +943,7 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
         });
       } else {
         // Fallback: download the image
-        alert('เบราว์เซอร์ของคุณไม่รองรับการแชร์โดยตรง กรุณาดาวน์โหลด QR Code แล้วแชร์เอง');
+        toast.error('เบราว์เซอร์ของคุณไม่รองรับการแชร์โดยตรง กรุณาดาวน์โหลด QR Code แล้วแชร์เอง');
         downloadQRCodeImage();
       }
     } catch (error) {
@@ -989,13 +992,10 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
     router.push('/theme-customization');
   };
 
-  if (isLoading) {
+  if (isLoading && !error) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">กำลังโหลด...</p>
-        </div>
+        <LoadingSpinner size="lg" text="กำลังโหลดข้อมูล..." />
       </div>
     );
   }
@@ -1036,10 +1036,10 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
                   onClick={async () => {
                     const isConnected = await testSupabaseConnection();
                     if (isConnected) {
-                      alert('✅ การเชื่อมต่อ Supabase สำเร็จ!');
+                      toast.success('การเชื่อมต่อ Supabase สำเร็จ!');
                       window.location.reload();
                     } else {
-                      alert('❌ ไม่สามารถเชื่อมต่อ Supabase ได้');
+                      toast.error('ไม่สามารถเชื่อมต่อ Supabase ได้');
                     }
                   }}
                   className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
@@ -1051,9 +1051,9 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
                   onClick={async () => {
                     const isConnected = await testDirectConnection();
                     if (isConnected) {
-                      alert('✅ การเชื่อมต่อโดยตรงสำเร็จ!');
+                      toast.success('การเชื่อมต่อโดยตรงสำเร็จ!');
                     } else {
-                      alert('❌ การเชื่อมต่อโดยตรงล้มเหลว');
+                      toast.error('การเชื่อมต่อโดยตรงล้มเหลว');
                     }
                   }}
                   className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
@@ -1098,15 +1098,15 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
     );
   }
 
-  if (error) {
+  if (error && !isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md mx-4">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <AlertCircle className="w-8 h-8 text-red-500" />
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">เกิดข้อผิดพลาด</h2>
-          <p className="text-gray-600 mb-4">{error}</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full space-y-4">
+          <ErrorMessage
+            title="เกิดข้อผิดพลาด"
+            message={error}
+            variant="error"
+          />
           
           <div className="space-y-3">
             <button
@@ -1144,10 +1144,10 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
               onClick={async () => {
                 const isConnected = await testDirectConnection();
                 if (isConnected) {
-                  alert('✅ การเชื่อมต่อโดยตรงสำเร็จ! ลองโหลดข้อมูลใหม่');
+                  toast.success('การเชื่อมต่อโดยตรงสำเร็จ! ลองโหลดข้อมูลใหม่');
                   window.location.reload();
                 } else {
-                  alert('❌ การเชื่อมต่อโดยตรงล้มเหลว - ปัญหาอยู่ที่ network/firewall');
+                  toast.error('การเชื่อมต่อโดยตรงล้มเหลว - ปัญหาอยู่ที่ network/firewall');
                 }
               }}
               className="w-full bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
@@ -1159,10 +1159,10 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
               onClick={async () => {
                 const isConnected = await testSupabaseConnection();
                 if (isConnected) {
-                  alert('✅ การเชื่อมต่อ Supabase สำเร็จ!');
+                  toast.success('การเชื่อมต่อ Supabase สำเร็จ!');
                   window.location.reload();
                 } else {
-                  alert('❌ ไม่สามารถเชื่อมต่อ Supabase ได้');
+                  toast.error('ไม่สามารถเชื่อมต่อ Supabase ได้');
                 }
               }}
               className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
@@ -1174,7 +1174,9 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
               onClick={async () => {
                 const { data: { session } } = await supabase!.auth.getSession();
                 
-                alert(`User ID: ${user?.id}\nSession: ${session ? 'Active' : 'None'}\nAuth Status: ${user ? 'Valid' : 'Invalid'}`);
+                const debugInfo = `User ID: ${user?.id}\nSession: ${session ? 'Active' : 'None'}\nAuth Status: ${user ? 'Valid' : 'Invalid'}`;
+                console.log('Debug Info:', debugInfo);
+                toast.success('ดูข้อมูล Debug ใน Console', { duration: 3000 });
               }}
               className="w-full bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
             >
@@ -1222,23 +1224,23 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-3 gap-2 md:gap-6 mb-8">
           <button
             type="button"
             onClick={() => setActiveStat('cards')}
-            className={`bg-white rounded-lg p-6 shadow-sm border text-left transition-all ${
+            className={`bg-white rounded-lg p-2 md:p-6 shadow-sm border text-left transition-all ${
               activeStat === 'cards'
                 ? 'border-blue-500 shadow-md ring-2 ring-blue-200'
                 : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
             }`}
           >
-            <div className="flex items-center">
-              <div className="p-2 bg-primary-100 rounded-lg">
-                <Share2 className="w-6 h-6 text-primary-600" />
+            <div className="flex flex-col md:flex-row items-center md:items-start">
+              <div className="p-1 md:p-2 bg-primary-100 rounded-lg flex-shrink-0 mb-2 md:mb-0">
+                <Share2 className="w-4 h-4 md:w-6 md:h-6 text-primary-600" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">นามบัตรทั้งหมด</p>
-                <p className="text-2xl font-bold text-gray-900">{cards?.length || 0}</p>
+              <div className="md:ml-4 flex-1 min-w-0 text-center md:text-left w-full md:w-auto">
+                <p className="text-xs md:text-sm font-medium text-gray-600 break-words leading-tight">นามบัตรทั้งหมด</p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 mt-0.5">{cards?.length || 0}</p>
               </div>
             </div>
           </button>
@@ -1246,19 +1248,19 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
           <button
             type="button"
             onClick={() => setActiveStat('leads')}
-            className={`bg-white rounded-lg p-6 shadow-sm border text-left transition-all ${
+            className={`bg-white rounded-lg p-2 md:p-6 shadow-sm border text-left transition-all ${
               activeStat === 'leads'
                 ? 'border-blue-500 shadow-md ring-2 ring-blue-200'
                 : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
             }`}
           >
-            <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Users className="w-6 h-6 text-green-600" />
+            <div className="flex flex-col md:flex-row items-center md:items-start">
+              <div className="p-1 md:p-2 bg-green-100 rounded-lg flex-shrink-0 mb-2 md:mb-0">
+                <Users className="w-4 h-4 md:w-6 md:h-6 text-green-600" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">การดาวน์โหลด vCard</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="md:ml-4 flex-1 min-w-0 text-center md:text-left w-full md:w-auto">
+                <p className="text-xs md:text-sm font-medium text-gray-600 break-words leading-tight">การดาวน์โหลด vCard</p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 mt-0.5">
                   {isLoadingTemplateStats ? '...' : leadCount.toLocaleString()}
                 </p>
               </div>
@@ -1268,19 +1270,19 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
           <button
             type="button"
             onClick={() => setActiveStat('views')}
-            className={`bg-white rounded-lg p-6 shadow-sm border text-left transition-all ${
+            className={`bg-white rounded-lg p-2 md:p-6 shadow-sm border text-left transition-all ${
               activeStat === 'views'
                 ? 'border-blue-500 shadow-md ring-2 ring-blue-200'
                 : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
             }`}
           >
-            <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <BarChart3 className="w-6 h-6 text-yellow-600" />
+            <div className="flex flex-col md:flex-row items-center md:items-start">
+              <div className="p-1 md:p-2 bg-yellow-100 rounded-lg flex-shrink-0 mb-2 md:mb-0">
+                <BarChart3 className="w-4 h-4 md:w-6 md:h-6 text-yellow-600" />
               </div>
-              <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">การเข้าดู</p>
-                <p className="text-2xl font-bold text-gray-900">
+              <div className="md:ml-4 flex-1 min-w-0 text-center md:text-left w-full md:w-auto">
+                <p className="text-xs md:text-sm font-medium text-gray-600 break-words leading-tight">การเข้าดู</p>
+                <p className="text-lg md:text-2xl font-bold text-gray-900 mt-0.5">
                   {isLoadingStats ? '...' : viewCount.toLocaleString()}
                 </p>
               </div>

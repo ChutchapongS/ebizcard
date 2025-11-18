@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import { Eye, EyeOff, ArrowRight, X } from 'lucide-react';
+import { sanitizeForInnerHTML } from '@/utils/sanitize';
 import 'react-quill/dist/quill.snow.css';
 
 export default function RegisterPage() {
@@ -20,14 +21,15 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [privacyPolicy, setPrivacyPolicy] = useState<string>('');
+  const [termsOfService, setTermsOfService] = useState<string>('');
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
   const [modalPrivacyContent, setModalPrivacyContent] = useState<string>('');
-  const [isComingSoonModalOpen, setIsComingSoonModalOpen] = useState<boolean>(false);
-  const [comingSoonTitle, setComingSoonTitle] = useState<string>('');
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
+  const [modalTermsContent, setModalTermsContent] = useState<string>('');
   const [logoUrl, setLogoUrl] = useState<string>('');
   const [siteName, setSiteName] = useState<string>('e-BizCard');
 
-  // Load privacy policy
+  // Load privacy policy and terms of service
   useEffect(() => {
     const loadSettings = async () => {
       try {
@@ -36,6 +38,9 @@ export default function RegisterPage() {
           const data = await response.json();
           if (data.success && data.settings?.privacy_policy) {
             setPrivacyPolicy(data.settings.privacy_policy);
+          }
+          if (data.success && data.settings?.terms_of_service) {
+            setTermsOfService(data.settings.terms_of_service);
           }
           if (data.success && data.settings?.logo_url) {
             setLogoUrl(data.settings.logo_url);
@@ -59,6 +64,14 @@ export default function RegisterPage() {
       }
     }
   }, [isPrivacyModalOpen, privacyPolicy, modalPrivacyContent]);
+
+  useEffect(() => {
+    if (isTermsModalOpen) {
+      if (!modalTermsContent && termsOfService) {
+        setModalTermsContent(termsOfService);
+      }
+    }
+  }, [isTermsModalOpen, termsOfService, modalTermsContent]);
 
   // Use the imported supabase client
 
@@ -314,9 +327,24 @@ export default function RegisterPage() {
                 ฉันยอมรับ{' '}
                 <button
                   type="button"
-                  onClick={() => {
-                    setComingSoonTitle('ข้อกำหนดการใช้งาน');
-                    setIsComingSoonModalOpen(true);
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/admin/web-settings');
+                      if (response.ok) {
+                        const data = await response.json();
+                        if (data.success && data.settings?.terms_of_service) {
+                          const termsContent = data.settings.terms_of_service;
+                          setTermsOfService(termsContent);
+                          setModalTermsContent(termsContent);
+                        } else {
+                          setTermsOfService('');
+                          setModalTermsContent('');
+                        }
+                      }
+                    } catch (error) {
+                      console.warn('Error reloading terms of service:', error);
+                    }
+                    setIsTermsModalOpen(true);
                   }}
                   className="text-primary-600 hover:text-primary-500 underline"
                 >
@@ -454,7 +482,7 @@ export default function RegisterPage() {
                           padding: 0,
                           color: '#111827',
                         }}
-                        dangerouslySetInnerHTML={{ __html: modalPrivacyContent }}
+                        dangerouslySetInnerHTML={sanitizeForInnerHTML(modalPrivacyContent)}
                       />
                     );
                   } else {
@@ -497,21 +525,21 @@ export default function RegisterPage() {
         </div>
       )}
 
-      {/* Coming Soon Modal */}
-      {isComingSoonModalOpen && (
+      {/* Terms of Service Modal */}
+      {isTermsModalOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50"
-          onClick={() => setIsComingSoonModalOpen(false)}
+          onClick={() => setIsTermsModalOpen(false)}
         >
           <div
-            className="bg-white rounded-lg shadow-xl max-w-md w-full"
+            className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">{comingSoonTitle}</h2>
+              <h2 className="text-2xl font-bold text-gray-900">ข้อกำหนดการใช้งาน</h2>
               <button
-                onClick={() => setIsComingSoonModalOpen(false)}
+                onClick={() => setIsTermsModalOpen(false)}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                 aria-label="ปิด"
               >
@@ -520,27 +548,56 @@ export default function RegisterPage() {
             </div>
 
             {/* Modal Content */}
-            <div className="p-6">
-              <div className="text-center py-8">
-                <div className="mb-4">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">กำลังพัฒนา</h3>
-                <p className="text-gray-600">
-                  ฟีเจอร์นี้กำลังอยู่ในขั้นตอนการพัฒนา<br />
-                  กรุณาติดตามอัปเดตในอนาคต
-                </p>
-              </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {(() => {
+                if (modalTermsContent && modalTermsContent.trim()) {
+                  const isHTML = modalTermsContent.includes('<') && modalTermsContent.includes('>');
+
+                  if (isHTML) {
+                    return (
+                      <div
+                        className="ql-editor"
+                        style={{
+                          fontFamily: 'inherit',
+                          fontSize: '14px',
+                          lineHeight: '1.5',
+                          padding: 0,
+                          color: '#111827',
+                        }}
+                        dangerouslySetInnerHTML={sanitizeForInnerHTML(modalTermsContent)}
+                      />
+                    );
+                  } else {
+                    return (
+                      <div
+                        className="ql-editor whitespace-pre-wrap"
+                        style={{
+                          fontFamily: 'inherit',
+                          fontSize: '14px',
+                          lineHeight: '1.5',
+                          padding: 0,
+                          color: '#111827',
+                        }}
+                      >
+                        {modalTermsContent}
+                      </div>
+                    );
+                  }
+                } else {
+                  return (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">ยังไม่มีเนื้อหาข้อกำหนดการใช้งาน</p>
+                      <p className="text-sm text-gray-400 mt-2">กรุณาติดต่อผู้ดูแลระบบ</p>
+                    </div>
+                  );
+                }
+              })()}
             </div>
 
             {/* Modal Footer */}
             <div className="p-6 border-t border-gray-200 flex justify-end">
               <button
-                onClick={() => setIsComingSoonModalOpen(false)}
+                onClick={() => setIsTermsModalOpen(false)}
                 className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
                 ปิด

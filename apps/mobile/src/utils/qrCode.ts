@@ -1,23 +1,45 @@
-import { qrCode } from '../services/supabase';
+import { generateQRCode as generateQRCodeShared, downloadQRCode as downloadQRCodeShared } from '@ebizcard/shared-utils';
+import { supabase } from '../services/supabase';
+import type { SupabaseService, DownloadHandler } from '@ebizcard/shared-utils';
 
-export const generateQRCode = async (cardId: string) => {
-  try {
-    const data = await qrCode.generate(cardId);
-    return data;
-  } catch (error) {
-    console.error('Error generating QR code:', error);
-    throw error;
-  }
+// Create Supabase service adapter
+const supabaseService: SupabaseService = {
+  functions: {
+    invoke: async (functionName: string, options: { body: any }) => {
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: options.body,
+      });
+      return { data, error };
+    },
+  },
 };
 
-export const downloadQRCode = async (qrCodeUrl: string, filename: string) => {
-  try {
+// Platform-specific download handler for React Native
+const downloadHandler: DownloadHandler = {
+  downloadVCard: async (vCardData: string, filename: string) => {
+    // For React Native, you would use a library like react-native-fs
+    // or expo-file-system to download the file
+    console.log('Downloading vCard:', filename);
+    // Implementation would depend on the specific file system library used
+  },
+  downloadQRCode: async (qrCodeUrl: string, filename: string) => {
     // For React Native, you would use a library like react-native-fs
     // or expo-file-system to download the file
     console.log('Downloading QR code:', qrCodeUrl, filename);
     // Implementation would depend on the specific file system library used
-  } catch (error) {
-    console.error('Error downloading QR code:', error);
-    throw error;
-  }
+  },
+};
+
+/**
+ * Generate QR Code using shared business logic
+ */
+export const generateQRCode = async (cardId: string) => {
+  return generateQRCodeShared(cardId, supabaseService);
+};
+
+/**
+ * Download QR Code using platform-specific implementation
+ */
+export const downloadQRCode = async (qrCodeUrl: string, filename: string) => {
+  return downloadQRCodeShared(qrCodeUrl, filename, downloadHandler);
 };

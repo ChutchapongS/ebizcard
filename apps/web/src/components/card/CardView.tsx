@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import { 
   Phone, 
   Mail, 
@@ -44,7 +45,7 @@ export const CardView = ({ card }: CardViewProps) => {
   const handleDownloadVCard = async () => {
     // Check if card has an ID (saved to database)
     if (!card.id || card.id === 'undefined' || card.id.startsWith('demo-')) {
-      alert('กรุณาบันทึกนามบัตรก่อนดาวน์โหลด vCard');
+      toast.error('กรุณาบันทึกนามบัตรก่อนดาวน์โหลด vCard');
       return;
     }
 
@@ -71,7 +72,7 @@ export const CardView = ({ card }: CardViewProps) => {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading vCard:', error);
-      alert('ไม่สามารถดาวน์โหลด vCard ได้');
+      toast.error('ไม่สามารถดาวน์โหลด vCard ได้');
     } finally {
       setIsDownloadingVCard(false);
     }
@@ -80,7 +81,7 @@ export const CardView = ({ card }: CardViewProps) => {
   const handleShare = async () => {
     // Check if card has an ID (saved to database)
     if (!card.id || card.id === 'undefined' || card.id.startsWith('demo-')) {
-      alert('กรุณาบันทึกนามบัตรก่อนแชร์');
+      toast.error('กรุณาบันทึกนามบัตรก่อนแชร์');
       return;
     }
 

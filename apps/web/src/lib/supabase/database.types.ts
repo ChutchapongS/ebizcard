@@ -153,6 +153,12 @@ export interface Database {
           full_name: string | null
           avatar_url: string | null
           created_at: string
+          user_type: string | null
+          user_plan: string | null
+          is_active: boolean | null
+          role_permissions: Json | null
+          assigned_by: string | null
+          role_updated_at: string | null
         }
         Insert: {
           id: string
@@ -160,6 +166,12 @@ export interface Database {
           full_name?: string | null
           avatar_url?: string | null
           created_at?: string
+          user_type?: string | null
+          user_plan?: string | null
+          is_active?: boolean | null
+          role_permissions?: Json | null
+          assigned_by?: string | null
+          role_updated_at?: string | null
         }
         Update: {
           id?: string
@@ -167,6 +179,12 @@ export interface Database {
           full_name?: string | null
           avatar_url?: string | null
           created_at?: string
+          user_type?: string | null
+          user_plan?: string | null
+          is_active?: boolean | null
+          role_permissions?: Json | null
+          assigned_by?: string | null
+          role_updated_at?: string | null
         }
       }
       templates: {

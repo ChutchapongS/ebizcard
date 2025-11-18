@@ -171,8 +171,8 @@ export default function MenuVisibilityTab({ userRole }: MenuVisibilityTabProps) 
         </p>
       </div>
 
-      {/* Menu Visibility Table */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      {/* Menu Visibility Table - Desktop */}
+      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden hidden md:block">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">การตั้งค่าการมองเห็นเมนู</h3>
         </div>
@@ -230,6 +230,54 @@ export default function MenuVisibilityTab({ userRole }: MenuVisibilityTabProps) 
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Menu Visibility Cards - Mobile */}
+      <div className="md:hidden space-y-4">
+        {Object.entries(menuVisibility).map(([menuKey, roleSettings]) => (
+          <div key={menuKey} className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+            {/* Menu Header */}
+            <div className="mb-4">
+              <div className="text-base font-semibold text-gray-900 mb-1">
+                {getMenuDisplayName(menuKey)}
+              </div>
+              <div className="text-sm text-gray-500">
+                /{menuKey}
+              </div>
+            </div>
+
+            {/* Role Toggles */}
+            <div className="space-y-3">
+              {['owner', 'admin', 'user'].map((role) => (
+                <div key={role} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
+                  <div className="flex items-center space-x-2">
+                    <div className="flex items-center">
+                      {getRoleIcon(role)}
+                    </div>
+                    <span className="text-sm font-medium text-gray-700">
+                      {getRoleDisplayName(role)}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => handleVisibilityChange(menuKey, role, !roleSettings[role])}
+                    className={`inline-flex items-center justify-center w-10 h-10 rounded-full transition-colors ${
+                      roleSettings[role]
+                        ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                    }`}
+                    title={`${roleSettings[role] ? 'ซ่อน' : 'แสดง'} สำหรับ ${getRoleDisplayName(role)}`}
+                  >
+                    {roleSettings[role] ? (
+                      <Eye className="w-5 h-5" />
+                    ) : (
+                      <EyeOff className="w-5 h-5" />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Legend */}

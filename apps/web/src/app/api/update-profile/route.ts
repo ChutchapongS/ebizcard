@@ -1,9 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import type { ProfileUpdateRequest, ProfileUpdateResponse, ApiError } from '@/types/api';
+import { rateLimit, RATE_LIMIT_CONFIGS, addRateLimitHeaders } from '@/lib/rate-limit';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+/**
+ * API Route: Update User Profile
+ * 
+ * Updates user profile information in both the profiles table and user metadata.
+ * This endpoint uses the service role key to bypass RLS policies.
+ * 
+ * @route POST /api/update-profile
+ * @access Private (requires service role key)
+ * 
+ * @param {NextRequest} request - The incoming request object
+ * @param {string} request.body.userId - The ID of the user to update
+ * @param {ProfileUpdateRequest} request.body.updates - The profile fields to update
+ * 
+ * @returns {Promise<NextResponse<ProfileUpdateResponse | ApiError>>}
+ * 
+ * @example
+ * ```typescript
+ * const response = await fetch('/api/update-profile', {
+ *   method: 'POST',
+ *   headers: { 'Content-Type': 'application/json' },
+ *   body: JSON.stringify({
+ *     userId: 'user-id',
+ *     updates: {
+ *       full_name: 'John Doe',
+ *       company: 'Acme Corp',
+ *       job_title: 'Developer'
+ *     }
+ *   })
+ * });
+ * ```
+ */
 export async function POST(request: NextRequest) {
   // Handle CORS
   const corsHeaders = {
@@ -15,6 +48,15 @@ export async function POST(request: NextRequest) {
   // Handle preflight requests
   if (request.method === 'OPTIONS') {
     return new Response(null, { status: 200, headers: corsHeaders });
+  }
+
+  // Apply rate limiting (standard for profile updates)
+  const rateLimitResponse = rateLimit(request, RATE_LIMIT_CONFIGS.standard);
+  if (rateLimitResponse) {
+    return NextResponse.json(
+      rateLimitResponse.body,
+      { status: 429, headers: { ...corsHeaders, ...rateLimitResponse.headers } }
+    );
   }
 
   try {
@@ -90,7 +132,7 @@ export async function POST(request: NextRequest) {
     // Also update the profiles table
     try {
       // Map updates to profiles table fields
-      const profileUpdates: any = {};
+      const profileUpdates: Partial<ProfileUpdateRequest> = {};
       if (updates.full_name !== undefined) profileUpdates.full_name = updates.full_name;
       if (updates.full_name_english !== undefined) profileUpdates.full_name_english = updates.full_name_english;
       if (updates.personal_phone !== undefined) profileUpdates.personal_phone = updates.personal_phone;
@@ -138,10 +180,11 @@ export async function POST(request: NextRequest) {
     // Note: Addresses are now updated via separate API route (/api/update-addresses)
     // This keeps the logic separated and cleaner
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       { success: true, error: null },
       { status: 200, headers: corsHeaders }
     );
+    return addRateLimitHeaders(response, request);
 
   } catch (error) {
     console.error('Error updating profile:', error);

@@ -1,0 +1,635 @@
+openapi: 3.0.3
+info:
+  title: e-BizCard API
+  description: |
+    API documentation for e-BizCard Digital Business Card Platform.
+    
+    This API provides endpoints for managing business cards, user profiles, QR codes, and more.
+  version: 1.0.0
+  contact:
+    name: e-BizCard Support
+    email: support@ebizcard.com
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+  - url: https://your-domain.com/api
+    description: Production server
+
+tags:
+  - name: Profile
+    description: User profile management
+  - name: Business Cards
+    description: Business card operations
+  - name: QR Code
+    description: QR code generation
+  - name: Contact
+    description: Contact form and management
+  - name: Addresses
+    description: User address management
+  - name: Templates
+    description: Business card templates
+  - name: Admin
+    description: Admin operations (requires admin role)
+
+paths:
+  /update-profile:
+    post:
+      tags:
+        - Profile
+      summary: Update user profile
+      description: Updates user profile information in both the profiles table and user metadata
+      operationId: updateProfile
+      security:
+        - ServiceRoleKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+                - updates
+              properties:
+                userId:
+                  type: string
+                  description: The ID of the user to update
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+                updates:
+                  $ref: '#/components/schemas/ProfileUpdateRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileUpdateResponse'
+        '400':
+          description: Bad request (missing userId or invalid updates)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /get-profile:
+    post:
+      tags:
+        - Profile
+      summary: Get user profile
+      description: Retrieves the complete user profile including addresses from the database
+      operationId: getProfile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - access_token
+              properties:
+                access_token:
+                  type: string
+                  description: User's access token for authentication
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        '200':
+          description: Profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  profile:
+                    $ref: '#/components/schemas/Profile'
+        '401':
+          description: Unauthorized - Invalid or missing access token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /update-addresses:
+    post:
+      tags:
+        - Addresses
+      summary: Update user addresses
+      description: Updates user addresses by deleting all existing addresses and inserting new ones
+      operationId: updateAddresses
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - access_token
+                - addresses
+              properties:
+                access_token:
+                  type: string
+                  description: User's access token for authentication
+                addresses:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/AddressInput'
+      responses:
+        '200':
+          description: Addresses updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Addresses updated successfully"
+        '400':
+          description: Bad request - Invalid addresses data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /contact:
+    post:
+      tags:
+        - Contact
+      summary: Send contact form message
+      description: Sends a contact form message via email (if Resend API key is configured) and saves to database
+      operationId: sendContact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - subject
+                - message
+              properties:
+                name:
+                  type: string
+                  description: Sender's name
+                  example: "John Doe"
+                email:
+                  type: string
+                  format: email
+                  description: Sender's email address
+                  example: "john@example.com"
+                subject:
+                  type: string
+                  description: Message subject
+                  example: "Question about pricing"
+                message:
+                  type: string
+                  description: Message content
+                  example: "I would like to know more about your pricing plans."
+      responses:
+        '200':
+          description: Message sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Message sent successfully"
+        '400':
+          description: Bad request - Missing required fields or invalid email format
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /generate-qr:
+    post:
+      tags:
+        - QR Code
+      summary: Generate QR code
+      description: Generates a QR code image for a business card that links to the public card view
+      operationId: generateQR
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - cardId
+              properties:
+                cardId:
+                  type: string
+                  description: The unique identifier of the business card
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        '200':
+          description: QR code generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  qrCode:
+                    type: string
+                    format: uri
+                    description: URL to the QR code image
+                    example: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://..."
+                  publicUrl:
+                    type: string
+                    format: uri
+                    description: Public URL to the business card
+                    example: "https://your-domain.com/card/123e4567-e89b-12d3-a456-426614174000"
+        '400':
+          description: Bad request - Missing cardId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /generate-vcard:
+    post:
+      tags:
+        - Business Cards
+      summary: Generate vCard file
+      description: Generates a vCard (.vcf) file for a business card
+      operationId: generateVCard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - cardId
+              properties:
+                cardId:
+                  type: string
+                  description: The unique identifier of the business card
+                  example: "123e4567-e89b-12d3-a456-426614174000"
+      responses:
+        '200':
+          description: vCard generated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  vCard:
+                    type: string
+                    description: vCard file content
+                    example: "BEGIN:VCARD\nVERSION:3.0\nFN:John Doe\n..."
+        '400':
+          description: Bad request - Missing cardId
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /card-views:
+    post:
+      tags:
+        - Business Cards
+      summary: Track card view
+      description: Records a view of a business card for analytics
+      operationId: trackCardView
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - cardId
+              properties:
+                cardId:
+                  type: string
+                  description: The unique identifier of the business card
+                cardName:
+                  type: string
+                  description: Name of the business card (optional)
+                deviceInfo:
+                  type: string
+                  description: Device and browser information
+                  example: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) - Windows"
+      responses:
+        '200':
+          description: View tracked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+  /templates:
+    get:
+      tags:
+        - Templates
+      summary: Get all templates
+      description: Retrieves all available business card templates
+      operationId: getTemplates
+      responses:
+        '200':
+          description: Templates retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Template'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from Supabase authentication
+    ServiceRoleKey:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Service role key for admin operations
+
+  schemas:
+    ProfileUpdateRequest:
+      type: object
+      properties:
+        full_name:
+          type: string
+          example: "John Doe"
+        full_name_english:
+          type: string
+          example: "John Doe"
+        personal_phone:
+          type: string
+          example: "+66123456789"
+        company:
+          type: string
+          example: "Acme Corp"
+        department:
+          type: string
+          example: "Engineering"
+        job_title:
+          type: string
+          example: "Senior Developer"
+        work_phone:
+          type: string
+          example: "+66123456789"
+        work_email:
+          type: string
+          format: email
+          example: "john@acmecorp.com"
+        website:
+          type: string
+          format: uri
+          example: "https://johndoe.com"
+        facebook:
+          type: string
+          format: uri
+          example: "https://facebook.com/johndoe"
+        line_id:
+          type: string
+          example: "johndoe"
+        linkedin:
+          type: string
+          format: uri
+          example: "https://linkedin.com/in/johndoe"
+        twitter:
+          type: string
+          format: uri
+          example: "https://twitter.com/johndoe"
+        instagram:
+          type: string
+          format: uri
+          example: "https://instagram.com/johndoe"
+        tiktok:
+          type: string
+          format: uri
+          example: "https://tiktok.com/@johndoe"
+        avatar_url:
+          type: string
+          format: uri
+          example: "https://storage.supabase.co/avatars/user-123.jpg"
+        profile_image:
+          type: string
+          description: Base64 encoded image data
+          example: "data:image/png;base64,iVBORw0KGgo..."
+
+    ProfileUpdateResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        error:
+          type: string
+          nullable: true
+          example: null
+
+    Profile:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        email:
+          type: string
+          format: email
+          example: "john@example.com"
+        full_name:
+          type: string
+          nullable: true
+          example: "John Doe"
+        full_name_english:
+          type: string
+          nullable: true
+          example: "John Doe"
+        avatar_url:
+          type: string
+          format: uri
+          nullable: true
+        addresses:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+
+    AddressInput:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [home, work, other]
+          default: home
+          example: "home"
+        place:
+          type: string
+          nullable: true
+          example: "Office"
+        address:
+          type: string
+          example: "123 Main Street"
+        tambon:
+          type: string
+          nullable: true
+          example: "Siam"
+        district:
+          type: string
+          example: "Pathumwan"
+        province:
+          type: string
+          example: "Bangkok"
+        postalCode:
+          type: string
+          nullable: true
+          example: "10330"
+        country:
+          type: string
+          default: "Thailand"
+          example: "Thailand"
+
+    Address:
+      type: object
+      properties:
+        type:
+          type: string
+          example: "home"
+        place:
+          type: string
+          nullable: true
+        address:
+          type: string
+        tambon:
+          type: string
+        district:
+          type: string
+        province:
+          type: string
+        postalCode:
+          type: string
+        country:
+          type: string
+
+    Template:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "template-1"
+        name:
+          type: string
+          example: "Modern Blue"
+        elements:
+          type: object
+          description: Template layout and styling configuration
+        paper_settings:
+          type: object
+          description: Paper/print settings
+        preview_url:
+          type: string
+          format: uri
+          nullable: true
+
+    ApiError:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          description: Error message
+          example: "Internal server error"
+        message:
+          type: string
+          description: Detailed error message
+          example: "Failed to update profile"
+        details:
+          type: string
+          description: Additional error details
+          example: "Database connection failed"
+

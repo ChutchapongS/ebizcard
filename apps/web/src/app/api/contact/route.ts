@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
+import { rateLimit, RATE_LIMIT_CONFIGS, addRateLimitHeaders } from '@/lib/rate-limit';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -10,6 +11,9 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 
 // POST - Send contact form email
 export async function POST(request: NextRequest) {
+  // Apply rate limiting (strict for contact form to prevent spam)
+  const rateLimitResponse = rateLimit(request, RATE_LIMIT_CONFIGS.strict);
+  if (rateLimitResponse) return rateLimitResponse;
   try {
     const body = await request.json();
     const { name, email, subject, message } = body;
@@ -104,7 +108,7 @@ ${message}
 
     // Send email using Resend
     let emailSent = false;
-    let emailError: any = null;
+    let emailError: string | Error | null = null;
 
     if (resend && process.env.RESEND_API_KEY) {
       try {
@@ -118,11 +122,9 @@ ${message}
         const fromEmail = process.env.RESEND_FROM_EMAIL;
         
         if (!fromEmail) {
-          emailError = {
-            message: 'RESEND_FROM_EMAIL not configured. Please verify a domain and set RESEND_FROM_EMAIL in .env.local',
-            hint: 'Go to https://resend.com/domains to verify your domain, then use an email from that domain',
-          };
-          throw new Error(emailError.message);
+          const errorMsg = 'RESEND_FROM_EMAIL not configured. Please verify a domain and set RESEND_FROM_EMAIL in .env.local';
+          emailError = errorMsg;
+          throw new Error(errorMsg);
         }
         
         const emailResult = await resend.emails.send({
@@ -156,11 +158,11 @@ ${message}
         if (emailResult.data && emailResult.data.id) {
           emailSent = true;
         } else {
-          emailError = emailResult.error || 'Unknown error';
+          emailError = emailResult.error ? String(emailResult.error) : 'Unknown error';
           console.error('❌ Email send failed:', emailResult.error);
         }
       } catch (error) {
-        emailError = error;
+        emailError = error instanceof Error ? error : String(error);
         console.error('❌ Error sending email:', error);
         if (error instanceof Error) {
           console.error('Error message:', error.message);
@@ -168,10 +170,7 @@ ${message}
         }
         // Check if it's a domain verification error
         if (error instanceof Error && error.message.includes('not verified')) {
-          emailError = {
-            message: error.message,
-            hint: 'Please verify your domain at https://resend.com/domains or use onboarding@resend.dev for testing',
-          };
+          emailError = error.message + ' - Please verify your domain at https://resend.com/domains or use onboarding@resend.dev for testing';
         }
       }
     } else {
@@ -182,21 +181,23 @@ ${message}
     }
 
     // Return response with email status
+    let response: NextResponse;
     if (emailSent) {
-      return NextResponse.json({
+      response = NextResponse.json({
         success: true,
         message: 'ส่งข้อความสำเร็จ อีเมลถูกส่งแล้ว',
         emailSent: true,
       });
     } else {
       // Still return success for form submission, but indicate email wasn't sent
-      return NextResponse.json({
+      response = NextResponse.json({
         success: true,
         message: 'ส่งข้อความสำเร็จ (ข้อมูลถูกบันทึกแล้ว แต่ไม่สามารถส่งอีเมลได้)',
         emailSent: false,
-        emailError: emailError?.message || emailError || 'Email service not configured',
+        emailError: emailError instanceof Error ? emailError.message : (emailError || 'Email service not configured'),
       });
     }
+    return addRateLimitHeaders(response, request);
 
   } catch (error) {
     console.error('❌ Error processing contact form:', error);

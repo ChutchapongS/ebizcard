@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST() {
+  // Disable in production for security
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: 'This endpoint is not available in production' },
+      { status: 403 }
+    );
+  }
+
   try {
     // Create admin client with service role key
     const supabaseAdmin = createClient(
@@ -103,12 +111,14 @@ export async function POST() {
       testUpload: 'success'
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Storage setup failed:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
     return NextResponse.json({
       success: false,
-      error: error.message,
-      details: error.stack
+      error: errorMessage,
+      ...(errorStack && { details: errorStack })
     }, { status: 500 });
   }
 }

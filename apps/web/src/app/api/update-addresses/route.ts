@@ -2,7 +2,51 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { Database } from '@/lib/supabase/database.types';
+import type { CookieOptions, AddressInput, AddressInsert, ApiError } from '@/types/api';
 
+/**
+ * API Route: Update User Addresses
+ * 
+ * Updates user addresses by deleting all existing addresses and inserting new ones.
+ * This endpoint uses a replace strategy (delete all, then insert new) to ensure
+ * data consistency.
+ * 
+ * @route POST /api/update-addresses
+ * @access Private (requires access token)
+ * 
+ * @param {NextRequest} request - The incoming request object
+ * @param {string} request.body.access_token - The user's access token for authentication
+ * @param {AddressInput[]} request.body.addresses - Array of address objects to save
+ * 
+ * @returns {Promise<NextResponse>} Response containing:
+ *   - success: boolean
+ *   - message: Success message
+ * 
+ * @throws {401} If access token is missing or invalid
+ * @throws {400} If addresses data is invalid or not an array
+ * @throws {500} If database operation fails
+ * 
+ * @example
+ * ```typescript
+ * const response = await fetch('/api/update-addresses', {
+ *   method: 'POST',
+ *   headers: { 'Content-Type': 'application/json' },
+ *   body: JSON.stringify({
+ *     access_token: 'user-access-token',
+ *     addresses: [
+ *       {
+ *         type: 'home',
+ *         address: '123 Main St',
+ *         district: 'District',
+ *         province: 'Province',
+ *         postalCode: '12345',
+ *         country: 'Thailand'
+ *       }
+ *     ]
+ *   })
+ * });
+ * ```
+ */
 export async function POST(request: NextRequest) {
   try {
     // Get access token and addresses from body
@@ -33,14 +77,14 @@ export async function POST(request: NextRequest) {
           get(name: string) {
             return cookies().get(name)?.value;
           },
-          set(name: string, value: string, options: any) {
+          set(name: string, value: string, options?: CookieOptions) {
             try {
               cookies().set(name, value, options);
             } catch (error) {
               // Handle cookie setting errors
             }
           },
-          remove(name: string, options: any) {
+          remove(name: string, options?: CookieOptions) {
             try {
               cookies().set(name, '', options);
             } catch (error) {
@@ -77,22 +121,21 @@ export async function POST(request: NextRequest) {
 
     // Insert new addresses
     if (addresses.length > 0) {
-      const addressesToInsert = addresses.map((address: any, index: number) => ({
+      const addressesToInsert: AddressInsert[] = addresses.map((address: AddressInput) => ({
         user_id: user.id,
         type: address.type || 'home',
         place: address.place || null,
         address: address.address || '',
-        tambon: address.tambon || null,
-        district: address.district || null,
-        province: address.province || null,
+        tambon: address.tambon || '',
+        district: address.district || '',
+        province: address.province || '',
         postal_code: address.postalCode || null,
         country: address.country || 'Thailand',
-        is_primary: index === 0, // First address is primary
       }));
 
       const { data: insertData, error: insertError } = await supabase
         .from('addresses')
-        .insert(addressesToInsert as any)
+        .insert(addressesToInsert)
         .select();
 
       if (insertError) {
@@ -109,12 +152,13 @@ export async function POST(request: NextRequest) {
       message: 'Addresses updated successfully'
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Update addresses error:', error);
-    return NextResponse.json(
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json<ApiError>(
       { 
         error: 'Internal server error', 
-        details: error.message 
+        details: errorMessage 
       },
       { status: 500 }
     );

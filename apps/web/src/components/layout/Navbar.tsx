@@ -30,6 +30,7 @@ export const Navbar = () => {
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string>('');
+  const [profileFullName, setProfileFullName] = useState<string>('');
   const [userRole, setUserRole] = useState<string>('user');
   const [userPlan, setUserPlan] = useState<string>('Free');
   const [websiteLogo, setWebsiteLogo] = useState<string>('');
@@ -39,10 +40,11 @@ export const Navbar = () => {
   const [navbarFontColor, setNavbarFontColor] = useState<string>('#000000');
 
   // Transform auth user to navbar user format
+  // Use full_name from profile table (via API) if available, otherwise fallback to user_metadata
   const user = authUser ? {
     id: authUser.id,
     email: authUser.email || '',
-    full_name: authUser.user_metadata?.full_name || authUser.user_metadata?.name,
+    full_name: profileFullName || authUser.user_metadata?.full_name || authUser.user_metadata?.name || '',
     avatar_url: profileImageUrl || authUser.user_metadata?.avatar_url,
     role: userRole
   } : null;
@@ -123,11 +125,27 @@ export const Navbar = () => {
             setProfileImageUrl(imageUrl);
           }
           
+          // Load full_name from profile table
+          if (result.profile.full_name) {
+            setProfileFullName(result.profile.full_name);
+          }
+          
           // Load user role and plan
-          const role = result.profile.user_type || 'user';
-          const plan = result.profile.user_plan || 'Free';
+          // user_type and user_plan are now properly typed
+          // Use ?? to preserve actual values from database (including 'user' and 'Free')
+          const role = result.profile.user_type ?? result.profile.role ?? 'user';
+          const plan = result.profile.user_plan ?? 'Free';
           setUserRole(role);
           setUserPlan(plan);
+          
+          // Debug log to check what we're getting
+          console.log('Navbar: Profile data:', {
+            full_name: result.profile.full_name,
+            user_type: result.profile.user_type,
+            role: result.profile.role,
+            user_plan: result.profile.user_plan,
+            email: result.profile.email
+          });
         }
       } catch (error) {
         console.warn('Navbar: Error loading profile data:', error);

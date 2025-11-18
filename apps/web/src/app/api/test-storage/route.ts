@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function GET() {
+  // Disable in production for security
+  if (process.env.NODE_ENV === 'production') {
+    return NextResponse.json(
+      { error: 'This endpoint is not available in production' },
+      { status: 403 }
+    );
+  }
+
   try {
     console.log('🧪 Testing Supabase Storage connection...');
     console.log('🔍 Environment check:');
@@ -92,13 +100,15 @@ export async function GET() {
       uploadTest: 'success'
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Test error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
     return NextResponse.json({
       success: false,
       error: 'Test failed',
-      details: error.message,
-      stack: error.stack
+      details: errorMessage,
+      ...(errorStack && { stack: errorStack })
     }, { status: 500 });
   }
 }

@@ -46,16 +46,6 @@ export default function AdminUsersPage() {
   const currentUserRole = users.find(u => u.id === user?.id)?.user_type;
   const isAdmin = currentUserRole === 'admin' || currentUserRole === 'owner';
   const isOwner = currentUserRole === 'owner';
-  
-  // For debugging
-  console.log('🔍 Admin page debug:', {
-    user: user?.email,
-    userId: user?.id,
-    usersCount: users.length,
-    currentUserRole,
-    isAdmin,
-    isOwner
-  });
 
   useEffect(() => {
     if (user && session) {
@@ -68,11 +58,6 @@ export default function AdminUsersPage() {
       setLoading(true);
       setError(null);
       
-      console.log('🔄 Fetching users...', {
-        hasSession: !!session,
-        hasAccessToken: !!session?.access_token
-      });
-      
       const response = await fetch('/api/admin/update-user-type', {
         headers: {
           'Authorization': `Bearer ${session?.access_token}`,
@@ -80,23 +65,12 @@ export default function AdminUsersPage() {
         },
       });
 
-      console.log('📡 API Response:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      });
-
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('❌ API Error:', errorData);
         throw new Error(errorData.error || 'Failed to fetch users');
       }
 
       const data = await response.json();
-      console.log('✅ API Success:', {
-        usersCount: data.users?.length || 0,
-        users: data.users
-      });
       
       setUsers(data.users);
     } catch (error) {

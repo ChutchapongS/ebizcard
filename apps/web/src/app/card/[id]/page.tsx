@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { PublicCardView } from '@/components/card/PublicCardView';
 import { BusinessCard } from '@/types';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { ErrorMessage } from '@/components/ui/ErrorMessage';
 
 export default function CardPage() {
   const params = useParams();
@@ -78,21 +80,20 @@ export default function CardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">กำลังโหลดนามบัตร...</p>
-        </div>
+        <LoadingSpinner size="lg" text="กำลังโหลดนามบัตร..." />
       </div>
     );
   }
 
   if (error || !card) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-6xl mb-4">😞</div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">ไม่พบนามบัตร</h1>
-          <p className="text-gray-600">นามบัตรนี้อาจถูกลบหรือไม่ถูกต้อง</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <ErrorMessage
+            title="ไม่พบนามบัตร"
+            message={error || 'นามบัตรนี้อาจถูกลบหรือไม่ถูกต้อง'}
+            variant="error"
+          />
         </div>
       </div>
     );

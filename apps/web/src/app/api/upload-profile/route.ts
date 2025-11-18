@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { Database } from '@/lib/supabase/database.types';
+import type { CookieOptions, ApiError } from '@/types/api';
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,14 +49,14 @@ export async function POST(request: NextRequest) {
           get(name: string) {
             return cookies().get(name)?.value;
           },
-          set(name: string, value: string, options: any) {
+          set(name: string, value: string, options?: CookieOptions) {
             try {
               cookies().set(name, value, options);
             } catch (error) {
               // Handle cookie setting errors
             }
           },
-          remove(name: string, options: any) {
+          remove(name: string, options?: CookieOptions) {
             try {
               cookies().set(name, '', options);
             } catch (error) {
@@ -138,14 +139,15 @@ export async function POST(request: NextRequest) {
       size: file.size
     });
 
-  } catch (error: any) {
+  } catch (error) {
     console.error('❌ Upload error:', error);
-    console.error('❌ Error stack:', error.stack);
-    return NextResponse.json(
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    return NextResponse.json<ApiError>(
       { 
         error: 'Internal server error', 
-        details: error.message,
-        stack: error.stack 
+        details: errorMessage,
+        ...(errorStack && { stack: errorStack })
       },
       { status: 500 }
     );

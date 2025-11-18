@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import type { WebSettingValue } from '@/types/api';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -28,9 +29,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Convert array of settings to object
-    const settings: Record<string, any> = {};
+    const settings: Partial<WebSettingValue> = {};
     settingsData.forEach(setting => {
-      settings[setting.setting_key] = setting.setting_value;
+      (settings as Record<string, string | number | object>)[setting.setting_key] = setting.setting_value;
     });
 
     // Convert string numbers to actual numbers or objects
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
     const upsertData: Array<{ setting_key: string; setting_value: string }> = [];
 
     // Helper function to add setting to upsert array
-    const addSetting = (key: string, value: any, isJson: boolean = false) => {
+    const addSetting = (key: string, value: WebSettingValue[string], isJson: boolean = false) => {
       if (value !== undefined && value !== null) {
         if (isJson) {
           try {
@@ -191,6 +192,7 @@ export async function POST(request: NextRequest) {
     
     // Policy settings
     addSetting('privacy_policy', settings.privacy_policy);
+    addSetting('terms_of_service', settings.terms_of_service);
     
     // System settings
     addSetting('max_cards_per_user', settings.max_cards_per_user);

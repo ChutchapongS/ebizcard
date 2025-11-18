@@ -146,3 +146,11 @@ temp/
 
 # Turbo
 .turbo/
+
+# Embedded git repository
+ebizcard/
+
+# Organized backup and debug files
+_backups/
+_debug/
+apps/web/tests/html/

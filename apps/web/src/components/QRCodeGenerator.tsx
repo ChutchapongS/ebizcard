@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { QrCode, Download, Copy, Check } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { ErrorMessage } from '@/components/ui/ErrorMessage';
+import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
 interface QRCodeGeneratorProps {
   cardId: string;
@@ -9,12 +12,38 @@ interface QRCodeGeneratorProps {
   className?: string;
 }
 
+/**
+ * React Component: QRCodeGenerator
+ * 
+ * A component that generates and displays a QR code for a business card.
+ * Provides functionality to generate, download, and copy the QR code URL.
+ * 
+ * The QR code automatically generates when the component mounts (if cardId is valid).
+ * Users can download the QR code image or copy the public URL to share.
+ * 
+ * @param {QRCodeGeneratorProps} props - Component props
+ * @param {string} props.cardId - The unique identifier of the business card
+ * @param {string} props.cardName - The name/title of the business card (for display)
+ * @param {string} [props.className] - Optional CSS class names for styling
+ * 
+ * @returns {JSX.Element} QR code generator component with controls
+ * 
+ * @example
+ * ```typescript
+ * <QRCodeGenerator 
+ *   cardId="card-123" 
+ *   cardName="John Doe's Business Card"
+ *   className="my-custom-class"
+ * />
+ * ```
+ */
 export const QRCodeGenerator = ({ cardId, cardName, className = '' }: QRCodeGeneratorProps) => {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [publicUrl, setPublicUrl] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Auto-generate QR code when component mounts
   useEffect(() => {
@@ -26,11 +55,14 @@ export const QRCodeGenerator = ({ cardId, cardName, className = '' }: QRCodeGene
   const generateQRCode = async () => {
     // Check if card has an ID (saved to database)
     if (!cardId || cardId === 'undefined' || cardId.startsWith('demo-')) {
-      alert('กรุณาบันทึกนามบัตรก่อนสร้าง QR Code');
+      const errorMsg = 'กรุณาบันทึกนามบัตรก่อนสร้าง QR Code';
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
     setIsGenerating(true);
+    setError(null);
     try {
       const response = await fetch('/api/generate-qr', {
         method: 'POST',
@@ -49,13 +81,16 @@ export const QRCodeGenerator = ({ cardId, cardName, className = '' }: QRCodeGene
       if (data.success) {
         setQrCodeUrl(data.qrCode);
         setPublicUrl(data.publicUrl);
+        toast.success('สร้าง QR Code สำเร็จ');
       } else {
         throw new Error(data.error || 'Failed to generate QR code');
       }
     } catch (error) {
       console.error('Error generating QR code:', error);
       const err = error as Error;
-      alert(`ไม่สามารถสร้าง QR Code ได้: ${err.message}`);
+      const errorMsg = `ไม่สามารถสร้าง QR Code ได้: ${err.message}`;
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsGenerating(false);
     }
@@ -78,7 +113,7 @@ export const QRCodeGenerator = ({ cardId, cardName, className = '' }: QRCodeGene
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading QR code:', error);
-      alert('ไม่สามารถดาวน์โหลด QR Code ได้');
+      toast.error('ไม่สามารถดาวน์โหลด QR Code ได้');
     } finally {
       setIsDownloading(false);
     }
@@ -88,10 +123,11 @@ export const QRCodeGenerator = ({ cardId, cardName, className = '' }: QRCodeGene
     try {
       await navigator.clipboard.writeText(publicUrl);
       setIsCopied(true);
+      toast.success('คัดลอกลิงก์สำเร็จ');
       setTimeout(() => setIsCopied(false), 2000);
     } catch (error) {
       console.error('Error copying URL:', error);
-      alert('ไม่สามารถคัดลอกลิงก์ได้');
+      toast.error('ไม่สามารถคัดลอกลิงก์ได้');
     }
   };
 
@@ -117,6 +153,24 @@ export const QRCodeGenerator = ({ cardId, cardName, className = '' }: QRCodeGene
     <div className={`bg-white rounded-lg border border-gray-200 p-6 ${className}`}>
       <div className="text-center">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">QR Code</h3>
+        
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4">
+            <ErrorMessage 
+              message={error} 
+              onDismiss={() => setError(null)}
+              variant="error"
+            />
+          </div>
+        )}
+        
+        {/* Loading State */}
+        {isGenerating && !qrCodeUrl && (
+          <div className="mb-4">
+            <LoadingSpinner text="กำลังสร้าง QR Code..." />
+          </div>
+        )}
         
         {qrCodeUrl ? (
           <div className="space-y-4">

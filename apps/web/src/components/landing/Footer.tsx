@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Mail, Phone, MapPin, X } from 'lucide-react';
+import { sanitizeForInnerHTML } from '@/utils/sanitize';
 import 'react-quill/dist/quill.snow.css';
 
 export const Footer = () => {
@@ -19,10 +20,11 @@ export const Footer = () => {
   const [socialFacebook, setSocialFacebook] = useState<string>('');
   const [socialYoutube, setSocialYoutube] = useState<string>('');
   const [privacyPolicy, setPrivacyPolicy] = useState<string>('');
+  const [termsOfService, setTermsOfService] = useState<string>('');
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState<boolean>(false);
   const [modalPrivacyContent, setModalPrivacyContent] = useState<string>('');
-  const [isComingSoonModalOpen, setIsComingSoonModalOpen] = useState<boolean>(false);
-  const [comingSoonTitle, setComingSoonTitle] = useState<string>('');
+  const [isTermsModalOpen, setIsTermsModalOpen] = useState<boolean>(false);
+  const [modalTermsContent, setModalTermsContent] = useState<string>('');
 
   // Sync modal content when modal opens
   useEffect(() => {
@@ -33,6 +35,15 @@ export const Footer = () => {
       }
     }
   }, [isPrivacyModalOpen, privacyPolicy, modalPrivacyContent]);
+
+  useEffect(() => {
+    if (isTermsModalOpen) {
+      // Use termsOfService if modalTermsContent is empty
+      if (!modalTermsContent && termsOfService) {
+        setModalTermsContent(termsOfService);
+      }
+    }
+  }, [isTermsModalOpen, termsOfService, modalTermsContent]);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -77,6 +88,11 @@ export const Footer = () => {
               setPrivacyPolicy(data.settings.privacy_policy);
             } else {
               setPrivacyPolicy('');
+            }
+            if (data.settings.terms_of_service) {
+              setTermsOfService(data.settings.terms_of_service);
+            } else {
+              setTermsOfService('');
             }
           }
         }
@@ -181,26 +197,6 @@ export const Footer = () => {
         {/* Support Links - Horizontal */}
         <div className="border-t border-gray-800 mt-8 pt-8">
           <div className="flex flex-wrap items-center gap-4 md:gap-6">
-            <button 
-              onClick={() => {
-                setComingSoonTitle('วิธีใช้งาน');
-                setIsComingSoonModalOpen(true);
-              }}
-              className="transition-colors text-sm hover:opacity-80 text-left"
-              style={{ color: footerFontColor || '#ffffff' }}
-            >
-              วิธีใช้งาน
-            </button>
-            <button 
-              onClick={() => {
-                setComingSoonTitle('เงื่อนไขการใช้งาน');
-                setIsComingSoonModalOpen(true);
-              }}
-              className="transition-colors text-sm hover:opacity-80 text-left"
-              style={{ color: footerFontColor || '#ffffff' }}
-            >
-              เงื่อนไขการใช้งาน
-            </button>
             <Link 
               href="/contact" 
               className="transition-colors text-sm hover:opacity-80"
@@ -208,6 +204,32 @@ export const Footer = () => {
             >
               ติดต่อเรา
             </Link>
+            <button 
+              onClick={async () => {
+                // Reload settings when opening modal to ensure latest data
+                try {
+                  const response = await fetch('/api/admin/web-settings');
+                  if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.settings?.terms_of_service) {
+                      const termsContent = data.settings.terms_of_service;
+                      setTermsOfService(termsContent);
+                      setModalTermsContent(termsContent);
+                    } else {
+                      setTermsOfService('');
+                      setModalTermsContent('');
+                    }
+                  }
+                } catch (error) {
+                  console.warn('Modal: Error reloading terms of service:', error);
+                }
+                setIsTermsModalOpen(true);
+              }}
+              className="transition-colors text-sm hover:opacity-80 text-left"
+              style={{ color: footerFontColor || '#ffffff' }}
+            >
+              ข้อกำหนดการใช้งาน
+            </button>
             <button 
               onClick={async () => {
                 // Reload settings when opening modal to ensure latest data
@@ -284,7 +306,7 @@ export const Footer = () => {
                           padding: 0,
                           color: '#111827',
                         }}
-                        dangerouslySetInnerHTML={{ __html: modalPrivacyContent }}
+                        dangerouslySetInnerHTML={sanitizeForInnerHTML(modalPrivacyContent)}
                       />
                     );
                   } else {
@@ -308,15 +330,6 @@ export const Footer = () => {
                     <div className="text-center py-12">
                       <p className="text-gray-500">ยังไม่มีเนื้อหานโยบายความเป็นส่วนตัว</p>
                       <p className="text-sm text-gray-400 mt-2">กรุณาติดต่อผู้ดูแลระบบ</p>
-                      {process.env.NODE_ENV === 'development' && (
-                        <div className="mt-4 text-xs text-gray-300">
-                          <p>Debug: modalPrivacyContent = "{modalPrivacyContent}"</p>
-                          <p>privacyPolicy = "{privacyPolicy}"</p>
-                          <p>Type: {typeof modalPrivacyContent}</p>
-                          <p>Length: {modalPrivacyContent?.length || 0}</p>
-                          <p>Trim result: "{modalPrivacyContent?.trim()}"</p>
-                        </div>
-                      )}
                     </div>
                   );
                 }
@@ -336,21 +349,21 @@ export const Footer = () => {
         </div>
       )}
 
-      {/* Coming Soon Modal */}
-      {isComingSoonModalOpen && (
+      {/* Terms of Service Modal */}
+      {isTermsModalOpen && (
         <div 
           className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black bg-opacity-50"
-          onClick={() => setIsComingSoonModalOpen(false)}
+          onClick={() => setIsTermsModalOpen(false)}
         >
           <div 
-            className="bg-white rounded-lg shadow-xl max-w-md w-full"
+            className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">{comingSoonTitle}</h2>
+              <h2 className="text-2xl font-bold text-gray-900">ข้อกำหนดการใช้งาน</h2>
               <button
-                onClick={() => setIsComingSoonModalOpen(false)}
+                onClick={() => setIsTermsModalOpen(false)}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
                 aria-label="ปิด"
               >
@@ -359,27 +372,56 @@ export const Footer = () => {
             </div>
 
             {/* Modal Content */}
-            <div className="p-6">
-              <div className="text-center py-8">
-                <div className="mb-4">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
-                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">กำลังพัฒนา</h3>
-                <p className="text-gray-600">
-                  ฟีเจอร์นี้กำลังอยู่ในขั้นตอนการพัฒนา<br />
-                  กรุณาติดตามอัปเดตในอนาคต
-                </p>
-              </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              {(() => {
+                if (modalTermsContent && modalTermsContent.trim()) {
+                  const isHTML = modalTermsContent.includes('<') && modalTermsContent.includes('>');
+                  
+                  if (isHTML) {
+                    return (
+                      <div 
+                        className="ql-editor"
+                        style={{
+                          fontFamily: 'inherit',
+                          fontSize: '14px',
+                          lineHeight: '1.5',
+                          padding: 0,
+                          color: '#111827',
+                        }}
+                        dangerouslySetInnerHTML={sanitizeForInnerHTML(modalTermsContent)}
+                      />
+                    );
+                  } else {
+                    return (
+                      <div 
+                        className="ql-editor whitespace-pre-wrap"
+                        style={{
+                          fontFamily: 'inherit',
+                          fontSize: '14px',
+                          lineHeight: '1.5',
+                          padding: 0,
+                          color: '#111827',
+                        }}
+                      >
+                        {modalTermsContent}
+                      </div>
+                    );
+                  }
+                } else {
+                  return (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">ยังไม่มีเนื้อหาข้อกำหนดการใช้งาน</p>
+                      <p className="text-sm text-gray-400 mt-2">กรุณาติดต่อผู้ดูแลระบบ</p>
+                    </div>
+                  );
+                }
+              })()}
             </div>
 
             {/* Modal Footer */}
             <div className="p-6 border-t border-gray-200 flex justify-end">
               <button
-                onClick={() => setIsComingSoonModalOpen(false)}
+                onClick={() => setIsTermsModalOpen(false)}
                 className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
               >
                 ปิด

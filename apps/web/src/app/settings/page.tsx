@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
@@ -47,11 +47,11 @@ import {
   Code,
   Gamepad2
 } from 'lucide-react';
-import { address } from '../../../../../address.js';
+import { getProvinces, getDistricts, getTambons, getPostalCode } from '@/utils/address';
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, signOut, updateProfile } = useAuth();
+  const { user, signOut, updateProfile, isLoading: authLoading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
@@ -76,6 +76,14 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState(1);
   const [activeAddressTab, setActiveAddressTab] = useState(1); // 1: เพิ่มที่อยู่ใหม่, 2: ที่อยู่ที่มีอยู่
   
+  // Check authentication and redirect if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push('/auth/login');
+    }
+  }, [user, authLoading, router]);
+
+  // Check auth providers
   useEffect(() => {
     if (!user) {
       setUsesEmailPassword(true);
@@ -136,10 +144,10 @@ export default function SettingsPage() {
     user?.user_metadata?.profile_image || 
     ''
   );
-  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null); // เก็บไฟล์รูปที่รอ upload
-  const [isUploadingImage, setIsUploadingImage] = useState(false); // สถานะกำลัง process รูป
-  const [pendingCompanyLogoFile, setPendingCompanyLogoFile] = useState<File | null>(null); // เก็บไฟล์รูป company logo ที่รอ upload
-  const [isUploadingCompanyLogo, setIsUploadingCompanyLogo] = useState(false); // สถานะกำลัง process รูป company logo
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [pendingCompanyLogoFile, setPendingCompanyLogoFile] = useState<File | null>(null);
+  const [isUploadingCompanyLogo, setIsUploadingCompanyLogo] = useState(false);
   
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || '');
   const [fullNameEnglish, setFullNameEnglish] = useState(user?.user_metadata?.full_name_english || '');
@@ -227,14 +235,14 @@ export default function SettingsPage() {
   const [hasUnsavedAddresses, setHasUnsavedAddresses] = useState(false);
   const [changedAddressIndices, setChangedAddressIndices] = useState<Set<number>>(new Set());
   const [newAddress, setNewAddress] = useState({
-    type: 'home', // home, work, other
+    type: 'home',
     address: '',
     tambon: '',
     district: '',
     province: '',
     postalCode: '',
     country: 'Thailand',
-    place: '' // สถานที่
+    place: ''
   });
   
   // Password form states
@@ -244,14 +252,56 @@ export default function SettingsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const hasFetchedInitialData = useRef(false);
 
+  // Helper function to load data from user metadata (fallback)
+  const loadDataFromUserMetadata = useCallback(() => {
+    if (user?.user_metadata) {
+      setProfileImage(user.user_metadata.avatar_url || user.user_metadata.profile_image || '');
+      setFullName(user.user_metadata.full_name || '');
+      setFullNameEnglish(user.user_metadata.full_name_english || '');
+      setPersonalPhone(user.user_metadata.personal_phone || '');
+      setPersonalId(user.user_metadata.personal_id || '');
+      setCompanyLogo(user.user_metadata.company_logo || '');
+      setCompany(user.user_metadata.company || '');
+      setDepartment(user.user_metadata.department || '');
+      setJobTitle(user.user_metadata.job_title || '');
+      setWorkPhone(user.user_metadata.work_phone || '');
+      setWorkEmail(user.user_metadata.work_email || '');
+      setWebsite(user.user_metadata.website || '');
+      setTaxIdMain(user.user_metadata.tax_id_main || '');
+      setTaxIdBranch(user.user_metadata.tax_id_branch || '');
+      setFacebook(user.user_metadata.facebook || '');
+      setLineId(user.user_metadata.line_id || '');
+      setLinkedin(user.user_metadata.linkedin || '');
+      setTwitter(user.user_metadata.twitter || '');
+      setInstagram(user.user_metadata.instagram || '');
+      setTiktok(user.user_metadata.tiktok || '');
+      setYoutube(user.user_metadata.youtube || '');
+      setTelegram(user.user_metadata.telegram || '');
+      setWhatsapp(user.user_metadata.whatsapp || '');
+      setWechat(user.user_metadata.wechat || '');
+      setSnapchat(user.user_metadata.snapchat || '');
+      setPinterest(user.user_metadata.pinterest || '');
+      setReddit(user.user_metadata.reddit || '');
+      setDiscord(user.user_metadata.discord || '');
+      setSlack(user.user_metadata.slack || '');
+      setViber(user.user_metadata.viber || '');
+      setSkype(user.user_metadata.skype || '');
+      setZoom(user.user_metadata.zoom || '');
+      setGithub(user.user_metadata.github || '');
+      setTwitch(user.user_metadata.twitch || '');
+      setAddresses(user.user_metadata.addresses || []);
+    }
+  }, [user]);
+
   // Function to load ALL profile data from profiles table via API route
-  const loadProfileData = async () => {
+  const loadProfileData = useCallback(async () => {
     if (!user?.id) {
+      console.log('Settings: loadProfileData - No user ID');
       return;
     }
     
+    console.log('Settings: loadProfileData - Starting to load profile data');
     try {
-      
       // Get session token
       const { data: { session } } = await supabase!.auth.getSession();
       
@@ -278,6 +328,12 @@ export default function SettingsPage() {
       
       if (result.success && result.profile) {
         const profile = result.profile;
+        console.log('Settings: loadProfileData - Profile loaded:', {
+          hasAvatar: !!profile.avatar_url,
+          hasFullName: !!profile.full_name,
+          hasPersonalId: !!profile.personal_id,
+          hasAddresses: !!profile.addresses
+        });
         
         // Parse addresses if it's a string (JSON), otherwise use as is
         let parsedAddresses = [];
@@ -452,90 +508,27 @@ export default function SettingsPage() {
       console.warn('Settings: Error loading profile data:', error);
       loadDataFromUserMetadata();
     }
-  };
-  
-  // Helper function to load data from user metadata (fallback)
-  const loadDataFromUserMetadata = () => {
-    if (user?.user_metadata) {
-      setProfileImage(user.user_metadata.avatar_url || user.user_metadata.profile_image || '');
-      setFullName(user.user_metadata.full_name || '');
-      setFullNameEnglish(user.user_metadata.full_name_english || '');
-      setPersonalPhone(user.user_metadata.personal_phone || '');
-      setPersonalId(user.user_metadata.personal_id || '');
-      setCompanyLogo(user.user_metadata.company_logo || '');
-      setCompany(user.user_metadata.company || '');
-      setDepartment(user.user_metadata.department || '');
-      setJobTitle(user.user_metadata.job_title || '');
-      setWorkPhone(user.user_metadata.work_phone || '');
-      setWorkEmail(user.user_metadata.work_email || '');
-      setWebsite(user.user_metadata.website || '');
-      setTaxIdMain(user.user_metadata.tax_id_main || '');
-      setTaxIdBranch(user.user_metadata.tax_id_branch || '');
-      setFacebook(user.user_metadata.facebook || '');
-      setLineId(user.user_metadata.line_id || '');
-      setLinkedin(user.user_metadata.linkedin || '');
-      setTwitter(user.user_metadata.twitter || '');
-      setInstagram(user.user_metadata.instagram || '');
-      setTiktok(user.user_metadata.tiktok || '');
-      setYoutube(user.user_metadata.youtube || '');
-      setTelegram(user.user_metadata.telegram || '');
-      setWhatsapp(user.user_metadata.whatsapp || '');
-      setWechat(user.user_metadata.wechat || '');
-      setSnapchat(user.user_metadata.snapchat || '');
-      setPinterest(user.user_metadata.pinterest || '');
-      setReddit(user.user_metadata.reddit || '');
-      setDiscord(user.user_metadata.discord || '');
-      setSlack(user.user_metadata.slack || '');
-      setViber(user.user_metadata.viber || '');
-      setSkype(user.user_metadata.skype || '');
-      setZoom(user.user_metadata.zoom || '');
-      setGithub(user.user_metadata.github || '');
-      setTwitch(user.user_metadata.twitch || '');
-      setAddresses(user.user_metadata.addresses || []);
-    }
-  };
-
-  // Function to fetch fresh user data from Supabase (กรณี 2: กดปุ่มรีเฟรช)
-  const fetchUserDataFromSupabase = async () => {
-    if (!user?.id) return;
-    
-    // ถ้ามีการเปลี่ยนแปลง ให้ยืนยันก่อน
-    const hasAnyUnsavedChanges = hasUnsavedPersonalInfo || hasUnsavedWorkInfo || hasUnsavedSocialMedia || hasUnsavedAddresses;
-    
-    if (hasAnyUnsavedChanges) {
-      if (!confirm('คุณมีข้อมูลที่ยังไม่ได้บันทึก การรีเฟรชจะยกเลิกการเปลี่ยนแปลง ต้องการดำเนินการต่อหรือไม่?')) {
-        return; // ยกเลิก
-      }
-    }
-    
-    setIsRefreshing(true);
-    hasFetchedInitialData.current = true; // Mark as fetched
-    try {
-      // Load ALL data from profiles table via API
-      await loadProfileData();
-      
-      // Show success message
-      setSuccessMessage('ดึงข้อมูลอัพเดตเรียบร้อยแล้ว');
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } catch (error) {
-      console.error('Settings: Error fetching fresh user data:', error);
-      setSuccessMessage('เกิดข้อผิดพลาดในการดึงข้อมูล');
-      setTimeout(() => setSuccessMessage(''), 3000);
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
+  }, [user, loadDataFromUserMetadata]);
 
   // Update form state when user data changes (กรณี 1: login เข้ามา)
   useEffect(() => {
     if (user?.id && !hasFetchedInitialData.current) {
+      console.log('Settings: useEffect - Loading profile data for user:', user.id);
       // Mark as fetched to prevent multiple calls
         hasFetchedInitialData.current = true;
       
       // Load ALL data from profiles table via API (ensures we get latest data)
-      loadProfileData();
+      loadProfileData().catch((error) => {
+        console.error('Settings: Error loading profile data:', error);
+        hasFetchedInitialData.current = false; // Reset flag on error
+      });
+    } else {
+      console.log('Settings: useEffect - Skipping load:', {
+        hasUserId: !!user?.id,
+        hasFetched: hasFetchedInitialData.current
+      });
     }
-  }, [user]);
+  }, [user?.id, loadProfileData]);
 
   // Reset fetch flag when component unmounts
   useEffect(() => {
@@ -690,6 +683,54 @@ export default function SettingsPage() {
     window.addEventListener('focus', handleFocus);
     return () => window.removeEventListener('focus', handleFocus);
   }, [activeTab, addresses, originalData]);
+
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">กำลังโหลด...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render content if user is not authenticated
+  if (!user) {
+    return null;
+  }
+
+  // Function to fetch fresh user data from Supabase (กรณี 2: กดปุ่มรีเฟรช)
+  const fetchUserDataFromSupabase = async () => {
+    if (!user?.id) return;
+    
+    // ถ้ามีการเปลี่ยนแปลง ให้ยืนยันก่อน
+    const hasAnyUnsavedChanges = hasUnsavedPersonalInfo || hasUnsavedWorkInfo || hasUnsavedSocialMedia || hasUnsavedAddresses;
+    
+    if (hasAnyUnsavedChanges) {
+      if (!confirm('คุณมีข้อมูลที่ยังไม่ได้บันทึก การรีเฟรชจะยกเลิกการเปลี่ยนแปลง ต้องการดำเนินการต่อหรือไม่?')) {
+        return; // ยกเลิก
+      }
+    }
+    
+    setIsRefreshing(true);
+    hasFetchedInitialData.current = true; // Mark as fetched
+    try {
+      // Load ALL data from profiles table via API
+      await loadProfileData();
+      
+      // Show success message
+      setSuccessMessage('ดึงข้อมูลอัพเดตเรียบร้อยแล้ว');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      console.error('Settings: Error fetching fresh user data:', error);
+      setSuccessMessage('เกิดข้อผิดพลาดในการดึงข้อมูล');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleSignOut = async () => {
     setIsLoading(true);
@@ -1469,10 +1510,42 @@ export default function SettingsPage() {
     }
   };
 
-  const handleDeleteAccount = () => {
-    if (confirm('คุณต้องการลบบัญชีหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้')) {
-      // TODO: Implement account deletion
-      alert('ฟีเจอร์นี้กำลังพัฒนา');
+  const handleDeleteAccount = async () => {
+    if (!confirm('คุณต้องการลบบัญชีหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้')) {
+      return;
+    }
+
+    // Double confirmation
+    const confirmed = confirm('คุณแน่ใจหรือไม่? ข้อมูลทั้งหมดจะถูกลบถาวรและไม่สามารถกู้คืนได้');
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      const response = await fetch('/api/delete-account', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'เกิดข้อผิดพลาดในการลบบัญชี');
+      }
+
+      alert('ลบบัญชีเรียบร้อยแล้ว');
+      // Sign out and redirect to home
+      await signOut();
+      router.push('/');
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      alert(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการลบบัญชี');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -1810,7 +1883,7 @@ export default function SettingsPage() {
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
                               <option value="">เลือกจังหวัด</option>
-                              {Object.keys(address).map((province) => (
+                              {getProvinces().map((province) => (
                                 <option key={province} value={province}>
                                   {province}
                                 </option>
@@ -1827,7 +1900,7 @@ export default function SettingsPage() {
                               onChange={(e) => {
                                 const district = e.target.value;
                                 const postalCode = personalAddress1.province && district ? 
-                                  (address as any)[personalAddress1.province]?.[district]?.PostCode || '' : '';
+                                  (getPostalCode(personalAddress1.province, district) || '') : '';
                                 setPersonalAddress1({
                                   ...personalAddress1,
                                   district,
@@ -1839,7 +1912,7 @@ export default function SettingsPage() {
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
                               <option value="">เลือกอำเภอ/เขต</option>
-                              {personalAddress1.province && Object.keys((address as any)[personalAddress1.province] || {}).map((district) => (
+                              {personalAddress1.province && getDistricts(personalAddress1.province).map((district) => (
                                 <option key={district} value={district}>
                                   {district}
                                 </option>
@@ -1856,7 +1929,7 @@ export default function SettingsPage() {
                               onChange={(e) => {
                                 const tambon = e.target.value;
                                 let postalCode = personalAddress1.province && personalAddress1.district && tambon ? 
-                                  (address as any)[personalAddress1.province]?.[personalAddress1.district]?.PostCode || '' : '';
+                                  (getPostalCode(personalAddress1.province, personalAddress1.district) || '') : '';
                                 
                                 // Special case for ตำบลแสนสุข in เมืองชลบุรี
                                 if (personalAddress1.province === 'ชลบุรี' && personalAddress1.district === 'เมืองชลบุรี' && tambon === 'แสนสุข') {
@@ -1874,7 +1947,7 @@ export default function SettingsPage() {
                             >
                               <option value="">เลือกตำบล/แขวง</option>
                               {personalAddress1.province && personalAddress1.district && 
-                                ((address as any)[personalAddress1.province]?.[personalAddress1.district]?.Tambons || []).map((tambon: string, tambonIndex: number) => (
+                                getTambons(personalAddress1.province, personalAddress1.district).map((tambon: string, tambonIndex: number) => (
                                   <option key={`${personalAddress1.province}-${personalAddress1.district}-${tambon}-${tambonIndex}`} value={tambon}>
                                     {tambon}
                                   </option>
@@ -1961,7 +2034,7 @@ export default function SettingsPage() {
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
                               <option value="">เลือกจังหวัด</option>
-                              {Object.keys(address).map((province) => (
+                              {getProvinces().map((province) => (
                                 <option key={province} value={province}>
                                   {province}
                                 </option>
@@ -1978,7 +2051,7 @@ export default function SettingsPage() {
                               onChange={(e) => {
                                 const district = e.target.value;
                                 const postalCode = personalAddress2.province && district ? 
-                                  (address as any)[personalAddress2.province]?.[district]?.PostCode || '' : '';
+                                  (getPostalCode(personalAddress2.province, district) || '') : '';
                                 setPersonalAddress2({
                                   ...personalAddress2,
                                   district,
@@ -1990,7 +2063,7 @@ export default function SettingsPage() {
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
                               <option value="">เลือกอำเภอ/เขต</option>
-                              {personalAddress2.province && Object.keys((address as any)[personalAddress2.province] || {}).map((district) => (
+                              {personalAddress2.province && getDistricts(personalAddress2.province).map((district) => (
                                 <option key={district} value={district}>
                                   {district}
                                 </option>
@@ -2007,7 +2080,7 @@ export default function SettingsPage() {
                               onChange={(e) => {
                                 const tambon = e.target.value;
                                 const postalCode = personalAddress2.province && personalAddress2.district && tambon ? 
-                                  (address as any)[personalAddress2.province]?.[personalAddress2.district]?.PostCode || '' : '';
+                                  (getPostalCode(personalAddress2.province, personalAddress2.district) || '') : '';
                                 setPersonalAddress2({
                                   ...personalAddress2,
                                   tambon,
@@ -2019,7 +2092,7 @@ export default function SettingsPage() {
                             >
                               <option value="">เลือกตำบล/แขวง</option>
                               {personalAddress2.province && personalAddress2.district && 
-                                ((address as any)[personalAddress2.province]?.[personalAddress2.district]?.Tambons || []).map((tambon: string, tambonIndex: number) => (
+                                getTambons(personalAddress2.province, personalAddress2.district).map((tambon: string, tambonIndex: number) => (
                                   <option key={`${personalAddress2.province}-${personalAddress2.district}-${tambon}-${tambonIndex}`} value={tambon}>
                                     {tambon}
                                   </option>
@@ -2291,7 +2364,7 @@ export default function SettingsPage() {
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
                               <option value="">เลือกจังหวัด</option>
-                              {Object.keys(address).map((province) => (
+                              {getProvinces().map((province) => (
                                 <option key={province} value={province}>
                                   {province}
                                 </option>
@@ -2308,7 +2381,7 @@ export default function SettingsPage() {
                               onChange={(e) => {
                                 const district = e.target.value;
                                 const postalCode = workAddress1.province && district ? 
-                                  (address as any)[workAddress1.province]?.[district]?.PostCode || '' : '';
+                                  (getPostalCode(workAddress1.province, district) || '') : '';
                                 setWorkAddress1({
                                   ...workAddress1,
                                   district,
@@ -2320,7 +2393,7 @@ export default function SettingsPage() {
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
                               <option value="">เลือกอำเภอ/เขต</option>
-                              {workAddress1.province && Object.keys((address as any)[workAddress1.province] || {}).map((district) => (
+                              {workAddress1.province && getDistricts(workAddress1.province).map((district) => (
                                 <option key={district} value={district}>
                                   {district}
                                 </option>
@@ -2337,7 +2410,7 @@ export default function SettingsPage() {
                               onChange={(e) => {
                                 const tambon = e.target.value;
                                 const postalCode = workAddress1.province && workAddress1.district && tambon ? 
-                                  (address as any)[workAddress1.province]?.[workAddress1.district]?.PostCode || '' : '';
+                                  (getPostalCode(workAddress1.province, workAddress1.district) || '') : '';
                                 setWorkAddress1({
                                   ...workAddress1,
                                   tambon,
@@ -2349,7 +2422,7 @@ export default function SettingsPage() {
                             >
                               <option value="">เลือกตำบล/แขวง</option>
                               {workAddress1.province && workAddress1.district && 
-                                ((address as any)[workAddress1.province]?.[workAddress1.district]?.Tambons || []).map((tambon: string, tambonIndex: number) => (
+                                getTambons(workAddress1.province, workAddress1.district).map((tambon: string, tambonIndex: number) => (
                                   <option key={`${workAddress1.province}-${workAddress1.district}-${tambon}-${tambonIndex}`} value={tambon}>
                                     {tambon}
                                   </option>
@@ -2436,7 +2509,7 @@ export default function SettingsPage() {
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
                               <option value="">เลือกจังหวัด</option>
-                              {Object.keys(address).map((province) => (
+                              {getProvinces().map((province) => (
                                 <option key={province} value={province}>
                                   {province}
                                 </option>
@@ -2453,7 +2526,7 @@ export default function SettingsPage() {
                               onChange={(e) => {
                                 const district = e.target.value;
                                 const postalCode = workAddress2.province && district ? 
-                                  (address as any)[workAddress2.province]?.[district]?.PostCode || '' : '';
+                                  (getPostalCode(workAddress2.province, district) || '') : '';
                                 setWorkAddress2({
                                   ...workAddress2,
                                   district,
@@ -2465,7 +2538,7 @@ export default function SettingsPage() {
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
                               <option value="">เลือกอำเภอ/เขต</option>
-                              {workAddress2.province && Object.keys((address as any)[workAddress2.province] || {}).map((district) => (
+                              {workAddress2.province && getDistricts(workAddress2.province).map((district) => (
                                 <option key={district} value={district}>
                                   {district}
                                 </option>
@@ -2482,7 +2555,7 @@ export default function SettingsPage() {
                               onChange={(e) => {
                                 const tambon = e.target.value;
                                 const postalCode = workAddress2.province && workAddress2.district && tambon ? 
-                                  (address as any)[workAddress2.province]?.[workAddress2.district]?.PostCode || '' : '';
+                                  (getPostalCode(workAddress2.province, workAddress2.district) || '') : '';
                                 setWorkAddress2({
                                   ...workAddress2,
                                   tambon,
@@ -2494,7 +2567,7 @@ export default function SettingsPage() {
                             >
                               <option value="">เลือกตำบล/แขวง</option>
                               {workAddress2.province && workAddress2.district && 
-                                ((address as any)[workAddress2.province]?.[workAddress2.district]?.Tambons || []).map((tambon: string, tambonIndex: number) => (
+                                getTambons(workAddress2.province, workAddress2.district).map((tambon: string, tambonIndex: number) => (
                                   <option key={`${workAddress2.province}-${workAddress2.district}-${tambon}-${tambonIndex}`} value={tambon}>
                                     {tambon}
                                   </option>
@@ -2935,7 +3008,7 @@ export default function SettingsPage() {
                                 className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                               >
                                 <option value="">เลือกจังหวัด</option>
-                                {Object.keys(address).map((province) => (
+                                {getProvinces().map((province) => (
                                   <option key={province} value={province}>
                                     {province}
                                   </option>
@@ -2952,7 +3025,7 @@ export default function SettingsPage() {
                                 onChange={(e) => {
                                   const district = e.target.value;
                                   const postalCode = newAddress.province && district ? 
-                                    (address as any)[newAddress.province]?.[district]?.PostCode || '' : '';
+                                    (getPostalCode(newAddress.province, district) || '') : '';
                                   setNewAddress({
                                     ...newAddress,
                                     district,
@@ -2964,7 +3037,7 @@ export default function SettingsPage() {
                                 className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                               >
                                 <option value="">เลือกอำเภอ/เขต</option>
-                                {newAddress.province && Object.keys((address as any)[newAddress.province] || {}).map((district) => (
+                                {newAddress.province && getDistricts(newAddress.province).map((district) => (
                                   <option key={district} value={district}>
                                     {district}
                                   </option>
@@ -2984,7 +3057,7 @@ export default function SettingsPage() {
                               >
                                 <option value="">เลือกตำบล/แขวง</option>
                                 {newAddress.province && newAddress.district && 
-                                  ((address as any)[newAddress.province]?.[newAddress.district]?.Tambons || []).map((tambon: string, tambonIndex: number) => (
+                                  getTambons(newAddress.province, newAddress.district).map((tambon: string, tambonIndex: number) => (
                                     <option key={`${newAddress.province}-${newAddress.district}-${tambon}-${tambonIndex}`} value={tambon}>
                                       {tambon}
                                     </option>

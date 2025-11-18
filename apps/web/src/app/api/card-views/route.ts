@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { rateLimit, RATE_LIMIT_CONFIGS, addRateLimitHeaders } from '@/lib/rate-limit';
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -7,6 +8,9 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const getSupabaseKey = () => SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
 
 export async function POST(request: NextRequest) {
+  // Apply rate limiting (relaxed for public card view tracking)
+  const rateLimitResponse = rateLimit(request, RATE_LIMIT_CONFIGS.relaxed);
+  if (rateLimitResponse) return rateLimitResponse;
   try {
     if (!SUPABASE_URL || !getSupabaseKey()) {
       console.error('Missing Supabase configuration for card view tracking');
@@ -53,7 +57,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true });
+    const response = NextResponse.json({ success: true });
+    return addRateLimitHeaders(response, request);
   } catch (error) {
     console.error('Card view tracking error:', error);
     return NextResponse.json(

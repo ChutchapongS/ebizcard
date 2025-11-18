@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { GradientEditor } from './GradientEditor';
 import { RichTextEditor } from './RichTextEditor';
+import { sanitizeForInnerHTML } from '@/utils/sanitize';
 import toast from 'react-hot-toast';
 
 interface WebSettingsTabProps {
@@ -46,6 +47,7 @@ interface WebSettings {
   footer_color?: string;
   footer_font_color?: string;
   privacy_policy?: string;
+  terms_of_service?: string;
 }
 
 interface SliderItem {
@@ -1446,7 +1448,8 @@ export default function WebSettingsTab({ userRole }: WebSettingsTabProps) {
           )}
         </button>
         {isPolicyExpanded && (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Privacy Policy */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 นโยบายความเป็นส่วนตัว
@@ -1478,7 +1481,52 @@ export default function WebSettingsTab({ userRole }: WebSettingsTabProps) {
                           lineHeight: '1.5',
                           padding: 0,
                         }}
-                        dangerouslySetInnerHTML={{ __html: settings.privacy_policy }}
+                        dangerouslySetInnerHTML={sanitizeForInnerHTML(settings.privacy_policy)}
+                      />
+                    ) : (
+                      <p className="text-gray-400 text-sm">ยังไม่มีเนื้อหา</p>
+                    )}
+                  </div>
+                  <p className="mt-2 text-xs text-gray-500">
+                    ตัวอย่างการแสดงผลบนหน้าเว็บ
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Terms of Service */}
+            <div className="pt-4 border-t border-gray-200">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                ข้อกำหนดการใช้งาน
+              </label>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                {/* Editor */}
+                <div>
+                  <RichTextEditor
+                    value={settings.terms_of_service ?? ''}
+                    onChange={(value) => setSettings({ ...settings, terms_of_service: value })}
+                    placeholder="กรุณาใส่เนื้อหาข้อกำหนดการใช้งาน..."
+                  />
+                  <p className="mt-2 text-xs text-gray-500">
+                    ใช้ toolbar ด้านบนเพื่อจัดรูปแบบข้อความ: ขนาดฟอนต์, หนา, เอียง, ขีดเส้นใต้, ขีดเส้นท้าย, จัดชิดซ้าย/ขวา/กลาง
+                  </p>
+                </div>
+                {/* Preview */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    ตัวอย่างการแสดงผล
+                  </label>
+                  <div className="w-full px-4 py-2 border border-gray-300 rounded-md bg-white min-h-[200px] max-h-[500px] overflow-y-auto">
+                    {settings.terms_of_service ? (
+                      <div 
+                        className="ql-editor"
+                        style={{
+                          fontFamily: 'inherit',
+                          fontSize: '14px',
+                          lineHeight: '1.5',
+                          padding: 0,
+                        }}
+                        dangerouslySetInnerHTML={sanitizeForInnerHTML(settings.terms_of_service)}
                       />
                     ) : (
                       <p className="text-gray-400 text-sm">ยังไม่มีเนื้อหา</p>

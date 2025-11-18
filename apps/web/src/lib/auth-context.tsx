@@ -40,6 +40,41 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/**
+ * React Hook: useAuth
+ * 
+ * Provides access to the authentication context including user, session, and auth methods.
+ * This hook must be used within an AuthProvider component.
+ * 
+ * @returns {AuthContextType} The authentication context containing:
+ *   - user: Current authenticated user or null
+ *   - session: Current session or null
+ *   - isAuthenticated: Boolean indicating if user is authenticated
+ *   - isLoading: Boolean indicating if auth state is being loaded
+ *   - isConnected: Boolean indicating Supabase connection status
+ *   - signIn: Function to sign in with email/password
+ *   - signUp: Function to sign up new user
+ *   - signOut: Function to sign out current user
+ *   - signInWithGoogle: Function to sign in with Google OAuth
+ *   - signInWithLinkedIn: Function to sign in with LinkedIn OAuth
+ *   - resetPassword: Function to reset user password
+ *   - updateProfile: Function to update user profile
+ * 
+ * @throws {Error} If used outside of AuthProvider
+ * 
+ * @example
+ * ```typescript
+ * function MyComponent() {
+ *   const { user, isAuthenticated, signIn, signOut } = useAuth();
+ *   
+ *   if (!isAuthenticated) {
+ *     return <LoginForm onSignIn={signIn} />;
+ *   }
+ *   
+ *   return <div>Welcome, {user?.email}</div>;
+ * }
+ * ```
+ */
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
@@ -52,7 +87,14 @@ interface AuthProviderProps {
   children: React.ReactNode;
 }
 
-// Helper function to check if we have valid Supabase credentials
+/**
+ * Helper function to check if we have valid Supabase credentials
+ * 
+ * Validates that Supabase environment variables are set and not using demo values.
+ * 
+ * @returns {boolean} True if valid credentials are configured, false otherwise
+ * @private
+ */
 const hasValidSupabaseCredentials = () => {
   return process.env.NEXT_PUBLIC_SUPABASE_URL && 
     process.env.NEXT_PUBLIC_SUPABASE_URL !== 'https://demo.supabase.co' &&
@@ -61,6 +103,35 @@ const hasValidSupabaseCredentials = () => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length > 50;
 };
 
+/**
+ * React Component: AuthProvider
+ * 
+ * Provides authentication context to all child components. Manages user session,
+ * authentication state, and provides methods for signing in/out and updating profiles.
+ * 
+ * This component should wrap the entire application or the portion that needs auth access.
+ * 
+ * @param {AuthProviderProps} props - Component props
+ * @param {React.ReactNode} props.children - Child components that need auth access
+ * 
+ * @returns {JSX.Element} Provider component wrapping children with auth context
+ * 
+ * @example
+ * ```typescript
+ * function App() {
+ *   return (
+ *     <AuthProvider>
+ *       <Router>
+ *         <Routes>
+ *           <Route path="/" element={<HomePage />} />
+ *           <Route path="/dashboard" element={<Dashboard />} />
+ *         </Routes>
+ *       </Router>
+ *     </AuthProvider>
+ *   );
+ * }
+ * ```
+ */
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);

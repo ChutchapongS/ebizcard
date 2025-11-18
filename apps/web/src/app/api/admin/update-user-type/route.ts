@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Prepare update data
-    const updateData: any = {
+    const updateData: UserTypeUpdate = {
       user_type: newRole,
       assigned_by: user.id,
       role_updated_at: new Date().toISOString()

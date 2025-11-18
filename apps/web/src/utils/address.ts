@@ -1,4 +1,6 @@
-import { address } from '../../../../address.js';
+// Import address data
+// @ts-ignore - address.js is a data file
+import { address } from '../data/address.js';
 
 // Interface สำหรับข้อมูลที่อยู่
 export interface AddressData {
