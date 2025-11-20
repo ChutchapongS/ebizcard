@@ -48,6 +48,7 @@ export const RichTextEditor = ({ value, onChange, placeholder }: RichTextEditorP
   return (
     <div className="rich-text-editor">
       <ReactQuill
+        // @ts-ignore ref is supported here but missing in type definition
         ref={quillRef}
         theme="snow"
         value={value}

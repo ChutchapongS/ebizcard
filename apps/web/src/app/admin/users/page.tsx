@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Navbar } from '@/components/layout/Navbar';
 import { Shield, Users, UserCheck, UserX, AlertCircle, Clock } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 interface User {
   id: string;
@@ -102,7 +103,7 @@ export default function AdminUsersPage() {
       }
 
       const data = await response.json();
-      alert(data.message);
+      toast.success(data.message);
       
       // Refresh users list
       await fetchUsers();
@@ -111,7 +112,7 @@ export default function AdminUsersPage() {
       setReason('');
     } catch (error) {
       console.error('Error updating user role:', error);
-      alert(error instanceof Error ? error.message : 'Failed to update user role');
+      toast.error(error instanceof Error ? error.message : 'Failed to update user role');
     }
   };
 

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import { BusinessCard, PaperCardTemplate, PaperCardSettings } from '@/types';
 import { Download, Printer, FileText, Settings } from 'lucide-react';
 
@@ -131,7 +132,7 @@ export const PaperCardExporter = ({ card, onClose }: PaperCardExporterProps) => 
       document.body.removeChild(a);
     } catch (error) {
       console.error('Export error:', error);
-      alert('Failed to export business card. Please try again.');
+      toast.error('Failed to export business card. Please try again.');
     }
   };
 

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase/client';
 import { Eye, EyeOff, ArrowRight, X } from 'lucide-react';
 import { sanitizeForInnerHTML } from '@/utils/sanitize';
+import toast from 'react-hot-toast';
 import 'react-quill/dist/quill.snow.css';
 
 export default function RegisterPage() {
@@ -111,7 +112,7 @@ export default function RegisterPage() {
       if (error) {
         setError(error.message);
       } else {
-        alert('สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี');
+        toast.success('สมัครสมาชิกสำเร็จ! กรุณาตรวจสอบอีเมลเพื่อยืนยันบัญชี');
         router.push('/auth/login');
       }
     } catch (error) {

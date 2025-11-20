@@ -1,71 +1,68 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/lib/supabase/database.types';
-import type { CookieOptions, ApiError } from '@/types/api';
+import type { ApiError } from '@/types/api';
 
 export async function POST(request: NextRequest) {
   try {
-    // Get access token from body
+    // ดึง body
     const body = await request.json();
     const accessToken = body.access_token;
-    const updates = body.updates;
+    const updates = body.updates as Partial<Database['public']['Tables']['profiles']['Update']>;
 
     if (!accessToken) {
-      return NextResponse.json(
-        { error: 'No access token provided' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'No access token provided' }, { status: 401 });
     }
 
     if (!updates || typeof updates !== 'object') {
-      return NextResponse.json(
-        { error: 'Invalid updates' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Invalid updates' }, { status: 400 });
     }
 
-    // Create Supabase client with Service Role Key
-    const supabase = createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name: string) {
-            return cookies().get(name)?.value;
-          },
-          set(name: string, value: string, options?: CookieOptions) {
-            try {
-              cookies().set(name, value, options);
-            } catch (error) {
-              // Handle cookie setting errors
-            }
-          },
-          remove(name: string, options?: CookieOptions) {
-            try {
-              cookies().set(name, '', options);
-            } catch (error) {
-              // Handle cookie removal errors
-            }
-          },
-        },
+    type ProfileUpdate = Database['public']['Tables']['profiles']['Update'];
+    const allowedFields: Array<keyof ProfileUpdate> = [
+      'email',
+      'full_name',
+      'avatar_url',
+      'created_at',
+      'user_type',
+      'user_plan',
+      'is_active',
+      'role_permissions',
+      'assigned_by',
+      'role_updated_at'
+    ];
+
+    // sanitize updates
+    const sanitizedUpdates: Partial<ProfileUpdate> = {};
+    for (const field of allowedFields) {
+      const value = updates[field];
+      if (value !== null && value !== undefined) {
+        // Type assertion needed because TypeScript can't narrow the union type properly
+        (sanitizedUpdates as Record<string, unknown>)[field] = value;
       }
+    }
+
+    if (Object.keys(sanitizedUpdates).length === 0) {
+      return NextResponse.json({ error: 'No valid update fields provided' }, { status: 400 });
+    }
+
+    // สร้าง Supabase client with service role key
+    const supabase = createClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // Get current user from token
+    // ดึง user จาก token
     const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
-    
     if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Update profiles table
+    // update profiles table แบบ type-safe
     const { error: updateError } = await supabase
       .from('profiles')
-      .update(updates)
+      // @ts-ignore - Supabase type inference issue with update method
+      .update(sanitizedUpdates)
       .eq('id', user.id);
 
     if (updateError) {
@@ -76,20 +73,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      success: true
-    });
+    return NextResponse.json({ success: true });
 
   } catch (error) {
     console.error('❌ Update profiles table error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json<ApiError>(
-      { 
-        error: 'Internal server error', 
-        details: errorMessage 
-      },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     );
   }
 }
-

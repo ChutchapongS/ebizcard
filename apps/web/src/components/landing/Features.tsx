@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { 
   Smartphone, 
   QrCode, 
@@ -134,10 +135,14 @@ export const Features = () => {
               >
                 <div className="w-12 h-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
                   {feature.icon_url ? (
-                    <img
+                    <Image
                       src={feature.icon_url}
                       alt={feature.title}
+                      width={24}
+                      height={24}
                       className="w-6 h-6 object-contain"
+                      sizes="24px"
+                      unoptimized
                     />
                   ) : DefaultIcon ? (
                     <DefaultIcon className="w-6 h-6 text-primary-600" />

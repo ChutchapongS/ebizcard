@@ -19,11 +19,11 @@
     "outDir": "./dist",
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./supabase/functions/*"]
     }
   },
   "include": [
-    "src/**/*"
+    "supabase/functions/**/*"
   ],
   "exclude": [
     "node_modules",

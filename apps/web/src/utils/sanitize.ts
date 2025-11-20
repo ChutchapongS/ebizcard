@@ -39,12 +39,12 @@ async function getDOMPurify(): Promise<any> {
         DOMPurifyInstance = module.default || module;
         return DOMPurifyInstance;
       })
-      .catch((error) => {
+      .catch((error: unknown) => {
         console.error('Failed to load DOMPurify:', error);
         DOMPurifyPromise = null;
         return null;
       });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed to load DOMPurify:', error);
     DOMPurifyPromise = null;
     return null;

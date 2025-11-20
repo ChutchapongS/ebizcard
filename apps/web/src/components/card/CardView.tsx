@@ -100,12 +100,12 @@ export const CardView = ({ card }: CardViewProps) => {
         console.log('Error sharing:', error);
         // If share was cancelled or failed, fallback to copy link
         navigator.clipboard.writeText(url);
-        alert('คัดลอกลิงก์เรียบร้อยแล้ว');
+        toast.success('คัดลอกลิงก์เรียบร้อยแล้ว');
       }
     } else {
       // Fallback to copying URL
       navigator.clipboard.writeText(url);
-      alert('คัดลอกลิงก์เรียบร้อยแล้ว');
+      toast.success('คัดลอกลิงก์เรียบร้อยแล้ว');
     }
   };
 

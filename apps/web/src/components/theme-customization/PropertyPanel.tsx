@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import Image from 'next/image';
 import { CanvasElement as Element } from '../../types/theme-customization';
 import QRCodeStyling from 'qr-code-styling';
 import { 
@@ -963,19 +964,21 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                 
                 {/* Image Preview */}
                 {(localElement.imageUrl || getFieldData(localElement.field || '')) && (
-                  <div className="mt-2">
-                    <img 
+                  <div className="mt-2 relative w-full h-32">
+                    <Image 
                       src={
-                        // ถ้ามี field binding ให้ใช้ข้อมูลจาก field ก่อน
                         (localElement.field && getFieldData(localElement.field)) 
-                          ? getFieldData(localElement.field)
-                          : localElement.imageUrl
+                          ? getFieldData(localElement.field) || ''
+                          : localElement.imageUrl || ''
                       } 
                       alt="Preview" 
-                  className="w-full h-32 object-cover rounded-md border border-gray-300"
-                  onError={(e) => {
-                    e.currentTarget.style.display = 'none';
-                  }}
+                      fill
+                      className="object-cover rounded-md border border-gray-300"
+                      sizes="100vw"
+                      unoptimized
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
                     />
                   </div>
                 )}

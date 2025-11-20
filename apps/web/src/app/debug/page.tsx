@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase/client';
 import { Navbar } from '@/components/layout/Navbar';
 import type { User, Session } from '@supabase/supabase-js';
+import toast from 'react-hot-toast';
 
 interface AuthLog {
   event: string;
@@ -145,12 +146,12 @@ export default function DebugPage() {
                 try {
                   const response = await fetch('/api/supabase-proxy?table=business_cards&select=count&limit=1');
                   if (!response.ok) {
-                    alert(`Connection error: ${response.status}`);
+                    toast.error(`Connection error: ${response.status}`);
                   } else {
-                    alert('Connection successful!');
+                    toast.success('Connection successful!');
                   }
                 } catch (err) {
-                  alert(`Connection failed: ${err}`);
+                  toast.error(`Connection failed: ${err}`);
                 }
               }}
               className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -161,20 +162,20 @@ export default function DebugPage() {
               onClick={async () => {
                 try {
                   if (!user) {
-                    alert('No user authenticated');
+                    toast.error('No user authenticated');
                     return;
                   }
                   
                   const response = await fetch(`/api/supabase-proxy?table=business_cards&select=*&user_id=eq.${user.id}&limit=5`);
                   
                   if (!response.ok) {
-                    alert(`Business cards error: ${response.status}`);
+                    toast.error(`Business cards error: ${response.status}`);
                   } else {
                     const data = await response.json();
-                    alert(`Found ${data?.length || 0} business cards`);
+                    toast.success(`พบข้อมูลนามบัตร ${data?.length || 0} รายการ`);
                   }
                 } catch (err) {
-                  alert(`Business cards failed: ${err}`);
+                  toast.error(`Business cards failed: ${err}`);
                 }
               }}
               className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
@@ -185,7 +186,7 @@ export default function DebugPage() {
               onClick={async () => {
                 try {
                   if (!user) {
-                    alert('No user authenticated');
+                    toast.error('No user authenticated');
                     return;
                   }
                   
@@ -208,10 +209,10 @@ export default function DebugPage() {
 
                   if (!response.ok) {
                     const errorData = await response.json();
-                    alert(`Card creation error: ${errorData.error || response.status}`);
+                    toast.error(`Card creation error: ${errorData.error || response.status}`);
                   } else {
                     const data = await response.json();
-                    alert(`Card created successfully: ${data.id}`);
+                    toast.success(`สร้างนามบัตรสำเร็จ: ${data.id}`);
                     
                     // Clean up using proxy
                     await fetch(`/api/supabase-proxy?table=business_cards&id=eq.${data.id}`, {
@@ -219,7 +220,7 @@ export default function DebugPage() {
                     });
                   }
                 } catch (err) {
-                  alert(`Card creation failed: ${err}`);
+                  toast.error(`Card creation failed: ${err}`);
                 }
               }}
               className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600"

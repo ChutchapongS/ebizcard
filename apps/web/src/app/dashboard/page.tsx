@@ -2,9 +2,22 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
-import { DashboardContent } from '@/components/dashboard/DashboardContent';
 import { Layout } from '@/components/layout/Layout';
+
+const DashboardContent = dynamic(
+  () =>
+    import('@/components/dashboard/DashboardContent').then((mod) => ({
+      default: mod.DashboardContent,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="p-8 text-center text-gray-500">กำลังโหลดแดชบอร์ด...</div>
+    ),
+  }
+);
 
 export default function DashboardPage() {
   const router = useRouter();

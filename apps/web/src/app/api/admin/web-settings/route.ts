@@ -35,10 +35,10 @@ export async function GET(request: NextRequest) {
     });
 
     // Convert string numbers to actual numbers or objects
-    if (settings.max_cards_per_user) {
+    if (settings.max_cards_per_user && typeof settings.max_cards_per_user === 'string') {
       settings.max_cards_per_user = parseInt(settings.max_cards_per_user, 10);
     }
-    if (settings.max_templates_per_user) {
+    if (settings.max_templates_per_user && typeof settings.max_templates_per_user === 'string') {
       settings.max_templates_per_user = parseInt(settings.max_templates_per_user, 10);
     }
     

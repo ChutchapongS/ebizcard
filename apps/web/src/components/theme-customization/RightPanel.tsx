@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { PaperSettings, CanvasElement } from '@/types/theme-customization';
 import { DraggableItem } from './DraggableItem';
 import PropertyPanel from './PropertyPanel';
@@ -486,10 +487,13 @@ export function RightPanel({
                     <div className="mb-3">
                       <div className="text-xs text-gray-600 mb-2">Current Image:</div>
                       <div className="relative w-full h-32 bg-gray-100 rounded-md overflow-hidden">
-                        <img
+                        <Image
                           src={paperSettings.background.image}
                           alt="Background preview"
-                          className="w-full h-full object-cover"
+                          fill
+                          className="object-cover"
+                          sizes="100vw"
+                          unoptimized
                           onError={(e) => {
                             e.currentTarget.style.display = 'none';
                             e.currentTarget.nextElementSibling?.classList.remove('hidden');

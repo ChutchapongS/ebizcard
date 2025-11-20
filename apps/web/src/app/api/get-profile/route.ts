@@ -152,7 +152,7 @@ export async function POST(request: NextRequest) {
 
     // Query profiles table with service role key (bypass RLS)
     console.log('🔧 Querying profiles table for user:', user.id);
-    let profileData;
+    let profileData: ProfileRow | null;
     let profileError;
     try {
       const profileResult = await supabase
@@ -181,10 +181,13 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // TypeScript needs explicit type narrowing here
+    const profile = profileData as ProfileRow | null;
+    
     console.log('✅ Profile data retrieved:', {
-      hasData: !!profileData,
-      hasAvatar: !!profileData?.avatar_url,
-      hasFullName: !!profileData?.full_name
+      hasData: !!profile,
+      hasAvatar: !!profile?.avatar_url,
+      hasFullName: !!profile?.full_name
     });
 
     // Query addresses table
@@ -212,9 +215,9 @@ export async function POST(request: NextRequest) {
 
     // Combine profile and addresses
     let finalAddresses = transformedAddresses;
-    if ((!transformedAddresses || transformedAddresses.length === 0) && profileData && 'addresses' in profileData) {
+    if ((!transformedAddresses || transformedAddresses.length === 0) && profile && 'addresses' in profile) {
       try {
-        const rawAddresses = (profileData as { addresses?: unknown }).addresses;
+        const rawAddresses = (profile as { addresses?: unknown }).addresses;
         if (typeof rawAddresses === 'string') {
           finalAddresses = JSON.parse(rawAddresses);
         } else if (Array.isArray(rawAddresses)) {
@@ -228,12 +231,12 @@ export async function POST(request: NextRequest) {
     // Ensure user_type and user_plan are explicitly included
     // These fields now exist in TypeScript types, but we ensure they're included
     const completeProfile = {
-      ...profileData,
+      ...profile,
       addresses: finalAddresses,
       // Explicitly include user_type and user_plan from database
       // Use the actual values from database, defaulting to 'user' and 'Free' if null
-      user_type: profileData?.user_type ?? 'user',
-      user_plan: profileData?.user_plan ?? 'Free',
+      user_type: profile?.user_type ?? 'user',
+      user_plan: profile?.user_plan ?? 'Free',
     };
 
     const response = NextResponse.json({
@@ -256,8 +259,7 @@ export async function POST(request: NextRequest) {
     console.error('❌ Error stack:', errorStack);
     console.error('❌ Error details:', {
       message: errorMessage,
-      name: error instanceof Error ? error.name : undefined,
-      cause: error instanceof Error ? error.cause : undefined
+      name: error instanceof Error ? error.name : undefined
     });
     
     // Make sure we always return JSON, not HTML

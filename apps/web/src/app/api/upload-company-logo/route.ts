@@ -41,26 +41,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Supabase client with Service Role Key for admin operations
+    const cookieStore = cookies();
     const supabase = createServerClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get(name: string) {
-            return cookies().get(name)?.value;
+          getAll() {
+            return cookieStore.getAll();
           },
-          set(name: string, value: string, options?: CookieOptions) {
+          setAll(cookiesToSet) {
             try {
-              cookies().set(name, value, options);
+              cookiesToSet.forEach(({ name, value, options }) => {
+                cookieStore.set(name, value, options);
+              });
             } catch (error) {
-              // Handle cookie setting errors
-            }
-          },
-          remove(name: string, options?: CookieOptions) {
-            try {
-              cookies().set(name, '', options);
-            } catch (error) {
-              // Handle cookie removal errors
+              // Ignore set errors in server context
             }
           },
         },

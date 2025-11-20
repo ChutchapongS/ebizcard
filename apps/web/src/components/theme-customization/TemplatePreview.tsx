@@ -3,6 +3,7 @@
 import { Template, CanvasElement, PaperSettings } from '@/types/theme-customization';
 import { MOCK_DATA } from '@/types/theme-customization';
 import { useMemo, memo, useRef, useCallback, useState, useEffect } from 'react';
+import Image from 'next/image';
 import { getUserFieldValue, UserData } from '@/utils/userDataUtils';
 import { 
   FaPalette, FaStar, FaHeart, FaThumbsUp, FaFire, FaLightbulb,
@@ -561,16 +562,16 @@ const TemplatePreview = memo(function TemplatePreview({ template, userData, scal
                 </div>
               )}
               
-              <img 
+              <Image 
                 src={imageUrl} 
                 alt="Bound Image" 
-                className={`w-full h-full object-contain transition-opacity duration-300 ${
+                fill
+                className={`object-contain transition-opacity duration-300 ${
                   isImageLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
-                onLoad={() => {
-                  // Image loaded successfully
-                  handleImageLoad(element.id);
-                }}
+                sizes="(min-width: 1024px) 25vw, 60vw"
+                unoptimized
+                onLoadingComplete={() => handleImageLoad(element.id)}
                 onError={(e) => {
                   console.error('❌ Image failed to load:', imageUrl.substring(0, 50) + '...');
                   console.error('❌ Full URL length:', imageUrl.length);
@@ -578,22 +579,13 @@ const TemplatePreview = memo(function TemplatePreview({ template, userData, scal
                   
                   handleImageError(element.id);
                   
-                  // Try to reload the image once
-                  const img = e.currentTarget;
-                  const originalSrc = img.src;
-                  
-                  // Add a small delay and retry
+                  const target = e.currentTarget;
+                  const originalSrc = target.currentSrc || imageUrl;
                   setTimeout(() => {
-                    if (img.src === originalSrc) {
-                      // Retrying image load
-                      img.src = originalSrc + '?retry=' + Date.now();
+                    if (target.src === originalSrc) {
+                      target.src = originalSrc + (originalSrc.includes('?') ? '&' : '?') + 'retry=' + Date.now();
                     }
                   }, 1000);
-                }}
-                style={{ 
-                  maxWidth: '100%', 
-                  maxHeight: '100%',
-                  display: 'block'
                 }}
               />
             </div>
@@ -604,7 +596,18 @@ const TemplatePreview = memo(function TemplatePreview({ template, userData, scal
       // Fallback to element's own imageUrl
       if (element.imageUrl) {
         // Using element imageUrl
-        return <img src={element.imageUrl} alt="Picture" className="w-full h-full object-contain" />;
+        return (
+          <div className="w-full h-full relative">
+            <Image
+              src={element.imageUrl}
+              alt="Picture"
+              fill
+              className="object-contain"
+              sizes="(min-width: 1024px) 25vw, 60vw"
+              unoptimized
+            />
+          </div>
+        );
       }
       
       // If no image available, show placeholder

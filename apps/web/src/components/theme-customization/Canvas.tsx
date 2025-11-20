@@ -2,6 +2,7 @@
 
 import { useDroppable } from '@dnd-kit/core';
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import { CanvasElement, PaperSettings, MockData } from '@/types/theme-customization';
 import { DraggableElement } from './DraggableElement';
 import { Facebook, MessageCircle, Linkedin, Twitter, Instagram, Video, Send, Smartphone, Camera, Pin, Users, Hash, PhoneCall, Mic, Code, Gamepad2 } from 'lucide-react';
@@ -928,18 +929,30 @@ export function Canvas({
                     }}
                   >
                     {element.type === 'picture' && (element.imageUrl || element.field) ? (
-                      <img 
-                        src={
-                          // ถ้ามี field binding ให้ใช้ข้อมูลจาก field ก่อน
-                          (element.field && userData) 
-                            ? (element.field === 'profileImage' ? (userData?.avatar_url || userData?.user_metadata?.avatar_url) : 
-                               element.field === 'companyLogo' ? (userData?.user_metadata?.company_logo) : null)
-                            : element.imageUrl
-                        } 
-                        alt={element.field === 'profileImage' ? 'Profile Picture' : 
-                             element.field === 'companyLogo' ? 'Company Logo' : 'Picture'} 
-                        className="w-full h-full object-contain" 
-                      />
+                      <div className="w-full h-full relative">
+                        <Image 
+                          src={
+                            (element.field && userData) 
+                              ? (element.field === 'profileImage'
+                                  ? (userData?.avatar_url || userData?.user_metadata?.avatar_url)
+                                  : element.field === 'companyLogo'
+                                    ? (userData?.user_metadata?.company_logo)
+                                    : element.imageUrl)
+                              : element.imageUrl || ''
+                          }
+                          alt={
+                            element.field === 'profileImage'
+                              ? 'Profile Picture'
+                              : element.field === 'companyLogo'
+                                ? 'Company Logo'
+                                : 'Picture'
+                          }
+                          fill
+                          className="object-contain"
+                          sizes="(min-width: 1024px) 20vw, 50vw"
+                          unoptimized
+                        />
+                      </div>
                     ) : element.type === 'textarea' ? (
                       <textarea
                         value={getElementContent(element)}

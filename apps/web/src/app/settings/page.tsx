@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import NextImage from 'next/image';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase/client';
-import { Layout } from '@/components/layout/Layout';
 import { 
   ArrowLeft, 
   User, 
@@ -48,6 +49,22 @@ import {
   Gamepad2
 } from 'lucide-react';
 import { getProvinces, getDistricts, getTambons, getPostalCode } from '@/utils/address';
+import toast from 'react-hot-toast';
+
+const Layout = dynamic(
+  () =>
+    import('@/components/layout/Layout').then((mod) => ({
+      default: mod.Layout,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="min-h-screen flex items-center justify-center text-gray-500">
+        กำลังโหลดหน้าการตั้งค่า...
+      </div>
+    ),
+  }
+);
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -758,7 +775,7 @@ export default function SettingsPage() {
       switch (activeTab) {
         case 1: // Personal Information
           if (!fullName.trim()) {
-            alert('กรุณากรอกชื่อ-นามสกุล');
+            toast.error('กรุณากรอกชื่อ-นามสกุล');
             setIsSaving(false);
             return;
           }
@@ -893,7 +910,7 @@ export default function SettingsPage() {
           break;
 
         default:
-          alert('ไม่พบแท็บที่เลือก');
+          toast.error('ไม่พบแท็บที่เลือก');
           return;
       }
 
@@ -941,7 +958,7 @@ export default function SettingsPage() {
         errorMessage += '\n\n' + JSON.stringify(error.details, null, 2);
       }
       
-      alert(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSaving(false);
     }
@@ -1059,24 +1076,24 @@ export default function SettingsPage() {
   const addAddress = () => {
     // ตรวจสอบจำนวนที่อยู่ (จำกัดไม่เกิน 3 ที่อยู่)
     if (addresses.length >= 3) {
-      alert('คุณสามารถเพิ่มที่อยู่ได้สูงสุด 3 ที่อยู่เท่านั้น\n\nกรุณาลบที่อยู่เก่าก่อนเพิ่มที่อยู่ใหม่');
+      toast.error('คุณสามารถเพิ่มที่อยู่ได้สูงสุด 3 ที่อยู่เท่านั้น\n\nกรุณาลบที่อยู่เก่าก่อนเพิ่มที่อยู่ใหม่');
       return;
     }
     
     if (!newAddress.address.trim()) {
-      alert('กรุณากรอกที่อยู่');
+      toast.error('กรุณากรอกที่อยู่');
       return;
     }
     if (!newAddress.province.trim()) {
-      alert('กรุณาเลือกจังหวัด');
+      toast.error('กรุณาเลือกจังหวัด');
       return;
     }
     if (!newAddress.district.trim()) {
-      alert('กรุณาเลือกอำเภอ/เขต');
+      toast.error('กรุณาเลือกอำเภอ/เขต');
       return;
     }
     if (!newAddress.tambon.trim()) {
-      alert('กรุณาเลือกตำบล/แขวง');
+      toast.error('กรุณาเลือกตำบล/แขวง');
       return;
     }
 
@@ -1106,19 +1123,19 @@ export default function SettingsPage() {
 
   const saveAddress = () => {
     if (!newAddress.address.trim()) {
-      alert('กรุณากรอกที่อยู่');
+      toast.error('กรุณากรอกที่อยู่');
       return;
     }
     if (!newAddress.province.trim()) {
-      alert('กรุณาเลือกจังหวัด');
+      toast.error('กรุณาเลือกจังหวัด');
       return;
     }
     if (!newAddress.district.trim()) {
-      alert('กรุณาเลือกอำเภอ/เขต');
+      toast.error('กรุณาเลือกอำเภอ/เขต');
       return;
     }
     if (!newAddress.tambon.trim()) {
-      alert('กรุณาเลือกตำบล/แขวง');
+      toast.error('กรุณาเลือกตำบล/แขวง');
       return;
     }
 
@@ -1306,13 +1323,13 @@ export default function SettingsPage() {
       };
       reader.onerror = () => {
         setIsUploadingImage(false);
-        alert('เกิดข้อผิดพลาดในการอ่านไฟล์');
+        toast.error('เกิดข้อผิดพลาดในการอ่านไฟล์');
       };
       reader.readAsDataURL(processedFile);
     } catch (error) {
       console.error('❌ Error processing image:', error);
       setIsUploadingImage(false);
-      alert('เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
+      toast.error('เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
     }
   };
 
@@ -1401,13 +1418,13 @@ export default function SettingsPage() {
       };
       reader.onerror = () => {
         setIsUploadingCompanyLogo(false);
-        alert('เกิดข้อผิดพลาดในการอ่านไฟล์');
+        toast.error('เกิดข้อผิดพลาดในการอ่านไฟล์');
       };
       reader.readAsDataURL(processedFile);
     } catch (error) {
       console.error('❌ Error processing image:', error);
       setIsUploadingCompanyLogo(false);
-      alert('เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
+      toast.error('เกิดข้อผิดพลาดในการประมวลผลรูปภาพ');
     }
   };
 
@@ -1424,17 +1441,17 @@ export default function SettingsPage() {
 
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
-      alert('กรุณากรอกข้อมูลให้ครบถ้วน');
+      toast.error('กรุณากรอกข้อมูลให้ครบถ้วน');
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      alert('รหัสผ่านใหม่ไม่ตรงกัน');
+      toast.error('รหัสผ่านใหม่ไม่ตรงกัน');
       return;
     }
 
     if (newPassword.length < 6) {
-      alert('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
+      toast.error('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร');
       return;
     }
 
@@ -1463,10 +1480,10 @@ export default function SettingsPage() {
       setConfirmPassword('');
       setShowPasswordForm(false);
       
-      alert('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว');
+      toast.success('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว');
     } catch (error: any) {
       console.error('Error changing password:', error);
-      alert('เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน: ' + (error.message || 'ไม่ทราบสาเหตุ'));
+      toast.error('เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน: ' + (error.message || 'ไม่ทราบสาเหตุ'));
     } finally {
       setIsLoading(false);
     }
@@ -1537,13 +1554,13 @@ export default function SettingsPage() {
         throw new Error(data.error || 'เกิดข้อผิดพลาดในการลบบัญชี');
       }
 
-      alert('ลบบัญชีเรียบร้อยแล้ว');
+      toast.success('ลบบัญชีเรียบร้อยแล้ว');
       // Sign out and redirect to home
       await signOut();
       router.push('/');
     } catch (error) {
       console.error('Error deleting account:', error);
-      alert(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการลบบัญชี');
+      toast.error(error instanceof Error ? error.message : 'เกิดข้อผิดพลาดในการลบบัญชี');
     } finally {
       setIsLoading(false);
     }
@@ -1691,12 +1708,16 @@ export default function SettingsPage() {
                       </label>
                       <div className="flex items-center space-x-4">
                         <div className="relative">
-                          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                          <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden relative">
                             {profileImage ? (
-                              <img
+                              <NextImage
                                 src={profileImage}
                                 alt="Profile"
-                                className="w-full h-full object-cover"
+                                fill
+                                className="object-cover"
+                                sizes="80px"
+                                unoptimized
+                                onError={() => setProfileImage('')}
                               />
                             ) : (
                               <User className="w-8 h-8 text-gray-400" />
@@ -2131,9 +2152,17 @@ export default function SettingsPage() {
                       </label>
                       <div className="flex items-center space-x-4">
                         <div className="relative">
-                          <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden">
+                          <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden relative">
                             {companyLogo ? (
-                              <img src={companyLogo} alt="Company Logo" className="w-full h-full object-cover" />
+                              <NextImage
+                                src={companyLogo}
+                                alt="Company Logo"
+                                fill
+                                className="object-cover"
+                                sizes="80px"
+                                unoptimized
+                                onError={() => setCompanyLogo('')}
+                              />
                             ) : (
                               <Building className="w-8 h-8 text-gray-400" />
                             )}

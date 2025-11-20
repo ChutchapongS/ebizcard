@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import { 
   Phone, 
   Mail, 
@@ -152,12 +153,12 @@ END:VCARD`;
         console.log('Error sharing:', error);
         // If share was cancelled or failed, fallback to copy link
         navigator.clipboard.writeText(url);
-        alert('คัดลอกลิงก์เรียบร้อยแล้ว');
+        toast.success('คัดลอกลิงก์เรียบร้อยแล้ว');
       }
     } else {
       // Fallback to copying URL
       navigator.clipboard.writeText(url);
-      alert('คัดลอกลิงก์เรียบร้อยแล้ว');
+      toast.success('คัดลอกลิงก์เรียบร้อยแล้ว');
     }
   };
 

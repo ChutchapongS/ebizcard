@@ -261,11 +261,11 @@ export const GradientEditor = ({ value, onChange, onTransparentChange, isTranspa
     e.preventDefault();
   };
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
+  const updateStopPosition = useCallback((clientX: number) => {
     if (!isDragging || !sliderRef.current) return;
     
     const rect = sliderRef.current.getBoundingClientRect();
-    const x = e.clientX - rect.left;
+    const x = clientX - rect.left;
     const position = Math.max(0, Math.min(100, (x / rect.width) * 100));
     const currentIndex = selectedIndexRef.current;
     
@@ -288,20 +288,28 @@ export const GradientEditor = ({ value, onChange, onTransparentChange, isTranspa
     });
   }, [isDragging]);
 
+  const handleDocumentMouseMove = useCallback((e: MouseEvent) => {
+    updateStopPosition(e.clientX);
+  }, [updateStopPosition]);
+
+  const handleSliderMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    updateStopPosition(e.clientX);
+  }, [updateStopPosition]);
+
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
   }, []);
 
   useEffect(() => {
     if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mousemove', handleDocumentMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mousemove', handleDocumentMouseMove);
         document.removeEventListener('mouseup', handleMouseUp);
       };
     }
-  }, [isDragging, handleMouseMove, handleMouseUp]);
+  }, [isDragging, handleDocumentMouseMove, handleMouseUp]);
 
   const gradientString = stopsToGradient(stops, direction);
   const selectedStop = stops[selectedStopIndex];
@@ -379,7 +387,7 @@ export const GradientEditor = ({ value, onChange, onTransparentChange, isTranspa
           style={{
             background: gradientString,
           }}
-          onMouseMove={handleMouseMove}
+          onMouseMove={handleSliderMouseMove}
           onMouseUp={handleMouseUp}
         />
         {/* Gradient Stops - positioned below the slider */}

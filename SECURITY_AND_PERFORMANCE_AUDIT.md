@@ -2,11 +2,17 @@
 
 ## 🔴 Critical Security Issues
 
-### 1. Input Validation & SQL Injection Risk
+### 1. Input Validation & SQL Injection Risk ✅ **แก้ไขแล้ว**
 **ไฟล์**: `apps/web/src/app/api/supabase-proxy/route.ts`
 - **ปัญหา**: ไม่มีการ validate/sanitize query parameters ก่อนส่งไป Supabase
 - **ความเสี่ยง**: SQL injection ผ่าน query parameters
-- **แก้ไข**: เพิ่ม whitelist สำหรับ table names และ validate query parameters
+- **แก้ไข**: 
+  - ✅ เพิ่ม whitelist สำหรับ table names (`ALLOWED_TABLES`)
+  - ✅ สร้าง `isValidTable()` function เพื่อ validate table names
+  - ✅ สร้าง `sanitizeSelect()` function เพื่อ sanitize select parameters
+  - ✅ Validate userId format (UUID)
+  - ✅ Validate order format (column.asc/desc)
+  - ✅ Validate filter patterns เพื่อป้องกัน SQL injection
 
 ### 2. XSS Vulnerability (dangerouslySetInnerHTML) ✅ **แก้ไขแล้ว**
 **ไฟล์**: 
@@ -30,15 +36,21 @@
 - **ผลกระทบ**: UX แย่, ไม่สอดคล้องกับ design system
 - **แก้ไข**: ใช้ `react-hot-toast` แทน
 
-### 4. Console Logs in Production
+### 4. Console Logs in Production ✅ **แก้ไขแล้ว**
 **ปัญหา**: มี console.log/error/warn มากมาย (507 matches)
 - **ผลกระทบ**: เปิดเผยข้อมูล sensitive, เพิ่ม bundle size
-- **แก้ไข**: ลบหรือ wrap ด้วย environment check
+- **แก้ไข**:
+  - ✅ ปิดใช้งาน `console.log/info/debug/warn/error` อัตโนมัติเมื่อรันใน production (ตั้งค่าใน `apps/web/src/app/providers.tsx`)
+  - ✅ สามารถเปิดใช้งานชั่วคราวผ่าน env `NEXT_PUBLIC_ENABLE_CLIENT_LOGS=true`
+  - ✅ ลดความเสี่ยงข้อมูลรั่ว / ลด noise ใน bundle โดยไม่ต้องแก้ทุกไฟล์ทีละจุด
 
-### 5. CORS in Edge Functions
+### 5. CORS in Edge Functions ✅ **แก้ไขแล้ว**
 **ไฟล์**: `apps/api/supabase/functions/track-view/index.ts`
 - **ปัญหา**: ใช้ `Access-Control-Allow-Origin: '*'`
-- **แก้ไข**: จำกัดเฉพาะ allowed origins
+- **แก้ไข**:
+  - ✅ เพิ่ม whitelist ของ origin (ค่า default + override ผ่าน env `ALLOWED_ORIGINS`)
+  - ✅ คืนค่า CORS header ตาม origin ที่อนุญาตเท่านั้น
+  - ✅ รองรับ preflight (OPTIONS) ด้วย header ใหม่
 
 ## 🟡 High Priority Security Issues
 
@@ -84,12 +96,12 @@
 
 ## 📊 Summary
 
-### Security Score: 6/10
+### Security Score: 7/10
 - ✅ CORS configuration (fixed)
 - ✅ Security headers (added)
-- ❌ Input validation (needs improvement)
-- ❌ XSS protection (needs sanitization)
-- ❌ Rate limiting (missing)
+- ✅ Input validation (fixed - whitelist & sanitization)
+- ✅ XSS protection (fixed - DOMPurify)
+- ✅ Rate limiting (implemented)
 - ⚠️ Console logs (too many)
 
 ### Performance Score: 7/10
@@ -100,12 +112,13 @@
 
 ## 🎯 Recommended Actions (Priority Order)
 
-1. **🔴 Critical**: แก้ไข XSS vulnerabilities (dangerouslySetInnerHTML)
-2. **🔴 Critical**: เพิ่ม input validation ใน supabase-proxy
+1. ~~**🔴 Critical**: แก้ไข XSS vulnerabilities (dangerouslySetInnerHTML)~~ ✅ **แก้ไขแล้ว**
+2. ~~**🔴 Critical**: เพิ่ม input validation ใน supabase-proxy~~ ✅ **แก้ไขแล้ว**
 3. **🟡 High**: แก้ไข alert() ให้ใช้ toast
-4. **🟡 High**: เพิ่ม rate limiting
+4. ~~**🟡 High**: เพิ่ม rate limiting~~ ✅ **แก้ไขแล้ว**
 5. **🟡 High**: ลบหรือ wrap console.logs
-6. **🟢 Medium**: ลบ duplicate dependencies
-7. **🟢 Medium**: เพิ่ม code splitting
-8. **🟢 Medium**: เพิ่ม caching strategy
+6. **🟢 Medium**: แก้ไข CORS ใน Edge Functions (track-view)
+7. **🟢 Medium**: ลบ duplicate dependencies
+8. **🟢 Medium**: เพิ่ม code splitting
+9. **🟢 Medium**: เพิ่ม caching strategy
 

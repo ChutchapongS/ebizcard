@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from '@/lib/auth-context';
@@ -15,6 +15,37 @@ const queryClient = new QueryClient({
 });
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const isProd = process.env.NODE_ENV === 'production';
+    const devOverride = process.env.NEXT_PUBLIC_ENABLE_CLIENT_LOGS === 'true';
+
+    if (!isProd || devOverride) {
+      return;
+    }
+
+    const methods = ['log', 'info', 'debug', 'warn', 'error'] as const;
+    type ConsoleMethod = (typeof methods)[number];
+    const originalConsole: Partial<Record<ConsoleMethod, (...args: unknown[]) => void>> = {};
+    const noop: (...args: unknown[]) => void = () => undefined;
+
+    methods.forEach((method) => {
+      originalConsole[method] = console[method] as Console['log'];
+      console[method] = noop as Console['log'];
+    });
+
+    return () => {
+      methods.forEach((method) => {
+        if (originalConsole[method]) {
+          console[method] = originalConsole[method]! as Console['log'];
+        }
+      });
+    };
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>

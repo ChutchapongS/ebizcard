@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "echo 'API functions are deployed to Supabase. No local dev server needed.'",
     "deploy": "supabase functions deploy",
-    "build": "tsc",
+    "build": "echo 'Supabase Edge Functions use Deno runtime and do not need to be built. Deploy with: supabase functions deploy'",
     "lint": "eslint . --ext .ts",
     "type-check": "tsc --noEmit"
   },

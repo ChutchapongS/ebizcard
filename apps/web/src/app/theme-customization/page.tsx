@@ -3,15 +3,53 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core';
+import dynamic from 'next/dynamic';
 import { Navbar } from '@/components/layout/Navbar';
-import { Canvas } from '@/components/theme-customization/Canvas';
-import { RightPanel } from '@/components/theme-customization/RightPanel';
 import { Template, CanvasElement, PaperSettings, MOCK_DATA } from '@/types/theme-customization';
 import { SAMPLE_TEMPLATES } from '@/data/sample-templates';
 import { useAuth } from '@/lib/auth-context';
-import { TemplatePreview } from '@/components/theme-customization/TemplatePreview';
 import { createUserData, UserData } from '@/utils/userDataUtils';
 import { Edit, Trash2, Eye, Copy, Plus, Save } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+const Canvas = dynamic(
+  () =>
+    import('@/components/theme-customization/Canvas').then((mod) => ({
+      default: mod.Canvas,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-center text-gray-400 p-6">กำลังโหลดผืนผ้าใบ...</div>
+    ),
+  }
+);
+
+const RightPanel = dynamic(
+  () =>
+    import('@/components/theme-customization/RightPanel').then((mod) => ({
+      default: mod.RightPanel,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-center text-gray-400 p-6">กำลังโหลดแผงปรับแต่ง...</div>
+    ),
+  }
+);
+
+const TemplatePreview = dynamic(
+  () =>
+    import('@/components/theme-customization/TemplatePreview').then((mod) => ({
+      default: mod.TemplatePreview,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-center text-gray-400 p-6">กำลังโหลดตัวอย่างแม่แบบ...</div>
+    ),
+  }
+);
 
 export default function ThemeCustomizationPage() {
   const router = useRouter();
@@ -994,7 +1032,7 @@ export default function ThemeCustomizationPage() {
           const isAdminOrOwner = currentUserRole === 'admin' || currentUserRole === 'owner';
           
           if (!isAdminOrOwner && userTemplatesCount >= maxTemplates) {
-            alert(`คุณสร้างแบบนามบัตรครบตามแผน ${userPlan} แล้ว (${maxTemplates} แบบ)\nกรุณาอัพเกรดแผนเพื่อสร้างแบบนามบัตรเพิ่มเติม`);
+            toast.error(`คุณสร้างแบบนามบัตรครบตามแผน ${userPlan} แล้ว (${maxTemplates} แบบ)\nกรุณาอัพเกรดแผนเพื่อสร้างแบบนามบัตรเพิ่มเติม`);
             setIsSaving(false);
             return;
           }
@@ -1047,7 +1085,7 @@ export default function ThemeCustomizationPage() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Error saving template:', errorData);
-        alert('เกิดข้อผิดพลาดในการบันทึก แบบนามบัตร: ' + errorData.error);
+        toast.error('เกิดข้อผิดพลาดในการบันทึก แบบนามบัตร: ' + errorData.error);
         setIsSaving(false);
         return;
       }
@@ -1067,7 +1105,7 @@ export default function ThemeCustomizationPage() {
         setHasUnsavedChanges(false);
         setIsSaving(false);
         
-        alert('Template อัปเดตสำเร็จ!');
+        toast.success('Template อัปเดตสำเร็จ!');
         // Store highlight for one-time badge and show immediately
         try {
           sessionStorage.setItem('templateHighlight', JSON.stringify({ id: editingTemplateId, type: 'update' }));
@@ -1105,7 +1143,7 @@ export default function ThemeCustomizationPage() {
         // Update user templates count
         setUserTemplatesCount(prev => prev + 1);
         
-        alert('Template บันทึกสำเร็จ!');
+        toast.success('Template บันทึกสำเร็จ!');
         setIsSaving(false);
         
         // Dispatch event to refresh templates in card-editor
@@ -1162,7 +1200,7 @@ export default function ThemeCustomizationPage() {
       
     } catch (error) {
       console.error('Error saving template:', error);
-      alert('เกิดข้อผิดพลาดในการบันทึก แบบนามบัตร: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('เกิดข้อผิดพลาดในการบันทึก แบบนามบัตร: ' + (error instanceof Error ? error.message : 'Unknown error'));
       setIsSaving(false);
     }
   };
@@ -1192,7 +1230,7 @@ export default function ThemeCustomizationPage() {
       
     } catch (error) {
       console.error('Error deleting template:', error);
-      alert('เกิดข้อผิดพลาดในการลบ Template');
+      toast.error('เกิดข้อผิดพลาดในการลบ Template');
     }
   };
 
@@ -1235,7 +1273,7 @@ export default function ThemeCustomizationPage() {
             window.location.href = '/dashboard';
           }
         } else {
-          alert('เกิดข้อผิดพลาดในการลบ Template: ' + errorData.error);
+          toast.error('เกิดข้อผิดพลาดในการลบ Template: ' + errorData.error);
         }
         return;
       }
@@ -1257,11 +1295,11 @@ export default function ThemeCustomizationPage() {
         return newUsage;
       });
       
-      alert('Template ถูกลบเรียบร้อยแล้ว!');
+      toast.success('Template ถูกลบเรียบร้อยแล้ว!');
       
     } catch (error) {
       console.error('Error deleting template:', error);
-      alert('เกิดข้อผิดพลาดในการลบ Template');
+      toast.error('เกิดข้อผิดพลาดในการลบ Template');
     }
   };
 
@@ -1298,7 +1336,7 @@ export default function ThemeCustomizationPage() {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Error copying template:', errorData);
-        alert('เกิดข้อผิดพลาดในการคัดลอก Template: ' + errorData.error);
+        toast.error('เกิดข้อผิดพลาดในการคัดลอก Template: ' + errorData.error);
         return;
       }
 
@@ -1317,7 +1355,7 @@ export default function ThemeCustomizationPage() {
       };
       
       setTemplates(prev => [...prev, newTemplate]);
-      alert('Template คัดลอกสำเร็จ!');
+      toast.success('Template คัดลอกสำเร็จ!');
       
       // Reset copy dialog
       setShowCopyDialog(false);
@@ -1326,7 +1364,7 @@ export default function ThemeCustomizationPage() {
       
     } catch (error) {
       console.error('Error copying template:', error);
-      alert('เกิดข้อผิดพลาดในการคัดลอก Template');
+      toast.error('เกิดข้อผิดพลาดในการคัดลอก Template');
     }
   };
 

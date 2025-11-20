@@ -2,6 +2,7 @@
 
 import { CanvasElement } from '@/types/theme-customization';
 import { useState, useRef, useEffect } from 'react';
+import Image from 'next/image';
 import { Facebook, MessageCircle, Linkedin, Twitter, Instagram, Video, Send, Smartphone, Camera, Pin, Users, Hash, PhoneCall, Mic, Code, Gamepad2 } from 'lucide-react';
 import QRCodeStyling from 'qr-code-styling';
 import { 
@@ -543,18 +544,25 @@ export function DraggableElement({
           }}
         >
           {(element.imageUrl || element.field) ? (
-            <img 
-              src={
-                // ถ้ามี field binding ให้ใช้ข้อมูลจาก field ก่อน
-                (element.field && userData) 
-                  ? (element.field === 'profileImage' ? (userData?.avatar_url || userData?.user_metadata?.avatar_url) : 
-                     element.field === 'companyLogo' ? (userData?.user_metadata?.company_logo) : null)
-                  : element.imageUrl
-              } 
-              alt={element.field === 'profileImage' ? 'Profile Picture' : 
-                   element.field === 'companyLogo' ? 'Company Logo' : 'Picture'} 
-              className="w-full h-full object-contain"
-            />
+            <div className="w-full h-full relative">
+              <Image 
+                src={
+                  (element.field && userData) 
+                    ? (element.field === 'profileImage'
+                        ? (userData?.avatar_url || userData?.user_metadata?.avatar_url)
+                        : element.field === 'companyLogo'
+                          ? (userData?.user_metadata?.company_logo)
+                          : element.imageUrl)
+                    : element.imageUrl || ''
+                } 
+                alt={element.field === 'profileImage' ? 'Profile Picture' : 
+                     element.field === 'companyLogo' ? 'Company Logo' : 'Picture'} 
+                fill
+                className="object-contain"
+                sizes="(min-width: 1024px) 15vw, 40vw"
+                unoptimized
+              />
+            </div>
           ) : (
             <div className="w-full h-full bg-gray-50 border-2 border-dashed border-gray-400 flex items-center justify-center">
               <div className="text-gray-500 text-4xl">🖼️</div>

@@ -6,8 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-// @ts-ignore - lru-cache types may not be available
-import LRUCache from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 
 // Rate limit configuration
 export interface RateLimitConfig {

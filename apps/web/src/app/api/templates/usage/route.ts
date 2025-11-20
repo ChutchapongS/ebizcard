@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
+// Force dynamic rendering since we query database
+export const dynamic = 'force-dynamic';
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
@@ -22,6 +25,10 @@ export async function GET(request: NextRequest) {
       .select('template_id');
 
     if (error) {
+      // Silently handle errors during build time
+      if (process.env.NEXT_PHASE === 'phase-production-build') {
+        return NextResponse.json({ usage: {} }, { status: 200 });
+      }
       console.error('Error fetching cards:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
@@ -37,6 +44,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ usage: usageMap });
   } catch (error) {
+    // Silently handle errors during build time
+    if (process.env.NEXT_PHASE === 'phase-production-build') {
+      return NextResponse.json({ usage: {} }, { status: 200 });
+    }
     console.error('Unexpected error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

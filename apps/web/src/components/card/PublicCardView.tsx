@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import toast from 'react-hot-toast';
 import { 
   Download,
   Share2
@@ -91,7 +92,7 @@ export const PublicCardView = ({ card }: PublicCardViewProps) => {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error downloading vCard:', error);
-      alert('ไม่สามารถดาวน์โหลด vCard ได้');
+      toast.error('ไม่สามารถดาวน์โหลด vCard ได้');
     } finally {
       setIsDownloadingVCard(false);
     }
@@ -112,12 +113,12 @@ export const PublicCardView = ({ card }: PublicCardViewProps) => {
         console.log('Error sharing:', error);
         // If share was cancelled or failed, fallback to copy link
         navigator.clipboard.writeText(url);
-        alert('คัดลอกลิงก์เรียบร้อยแล้ว');
+        toast.success('คัดลอกลิงก์เรียบร้อยแล้ว');
       }
     } else {
       // Fallback to copying URL
       navigator.clipboard.writeText(url);
-      alert('คัดลอกลิงก์เรียบร้อยแล้ว');
+      toast.success('คัดลอกลิงก์เรียบร้อยแล้ว');
     }
   };
 

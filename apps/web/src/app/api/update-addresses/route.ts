@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { Database } from '@/lib/supabase/database.types';
 import type { CookieOptions, AddressInput, AddressInsert, ApiError } from '@/types/api';
@@ -69,26 +70,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Supabase client with Service Role Key
-    const supabase = createServerClient<Database>(
+    const cookieStore = cookies();
+    const supabase: SupabaseClient<Database, 'public'> = createServerClient<Database, 'public'>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get(name: string) {
-            return cookies().get(name)?.value;
+          getAll() {
+            return cookieStore.getAll();
           },
-          set(name: string, value: string, options?: CookieOptions) {
+          setAll(cookiesToSet) {
             try {
-              cookies().set(name, value, options);
+              cookiesToSet.forEach(({ name, value, options }) => {
+                cookieStore.set(name, value, options);
+              });
             } catch (error) {
-              // Handle cookie setting errors
-            }
-          },
-          remove(name: string, options?: CookieOptions) {
-            try {
-              cookies().set(name, '', options);
-            } catch (error) {
-              // Handle cookie removal errors
+              // Ignore set errors in server context
             }
           },
         },
@@ -121,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     // Insert new addresses
     if (addresses.length > 0) {
-      const addressesToInsert: AddressInsert[] = addresses.map((address: AddressInput) => ({
+      const addressesToInsert: Database['public']['Tables']['addresses']['Insert'][] = addresses.map((address: AddressInput) => ({
         user_id: user.id,
         type: address.type || 'home',
         place: address.place || null,
@@ -133,9 +130,11 @@ export async function POST(request: NextRequest) {
         country: address.country || 'Thailand',
       }));
 
+      // Supabase type inference struggles when using service-role clients in API routes.
+      // We assert here to avoid the `never` insert overload error while still sending the typed payload.
       const { data: insertData, error: insertError } = await supabase
         .from('addresses')
-        .insert(addressesToInsert)
+        .insert(addressesToInsert as any)
         .select();
 
       if (insertError) {

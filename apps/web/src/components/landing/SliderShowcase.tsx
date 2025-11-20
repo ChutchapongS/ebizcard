@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 export interface SlideItem {
@@ -158,14 +159,14 @@ export const SliderShowcase = () => {
             <div className="relative">
               <div className="h-64 sm:h-72 md:h-80 lg:h-96 rounded-3xl overflow-hidden border-2 border-teal-400/50 shadow-2xl relative">
                 {(currentSlide.background_type === 'image' || (!currentSlide.background_type && currentSlide.image_url)) && currentSlide.image_url ? (
-                  <>
-                    {/* Image only - no text overlay */}
-                    <img
-                      src={currentSlide.image_url}
-                      alt={currentSlide.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </>
+                  <Image
+                    src={currentSlide.image_url}
+                    alt={currentSlide.title}
+                    fill
+                    className="object-cover"
+                    sizes="(min-width: 1024px) 50vw, 100vw"
+                    unoptimized
+                  />
                 ) : (
                   <div
                     className={`h-full w-full flex items-center justify-center ${

@@ -2,14 +2,14 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
 import { BusinessCard } from '@/types';
 import { businessCards } from '@/lib/supabase/client';
-import { CardView } from '@/components/card/CardView';
-import { TemplatePreview } from '@/components/theme-customization/TemplatePreview';
 import { ArrowLeft, Save, ChevronDown, Edit, Plus } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { createUserData, UserData, getUserFieldValue } from '@/utils/userDataUtils';
+import toast from 'react-hot-toast';
 import { 
   FaPalette, FaStar, FaHeart, FaThumbsUp, FaFire, FaLightbulb,
   FaRocket, FaGem, FaBullseye, FaDumbbell, FaGift,
@@ -21,6 +21,32 @@ import {
   FaPinterest, FaReddit, FaDiscord, FaSlack, FaViber, FaSkype, 
   FaGithub, FaTwitch
 } from 'react-icons/fa';
+
+const CardView = dynamic(
+  () =>
+    import('@/components/card/CardView').then((mod) => ({
+      default: mod.CardView,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-center text-gray-500">กำลังโหลดมุมมองนามบัตร...</div>
+    ),
+  }
+);
+
+const TemplatePreview = dynamic(
+  () =>
+    import('@/components/theme-customization/TemplatePreview').then((mod) => ({
+      default: mod.TemplatePreview,
+    })),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="text-center text-gray-400">กำลังโหลดตัวอย่างแม่แบบ...</div>
+    ),
+  }
+);
 
 export default function CardEditorPage() {
   // console.log('🎨 CardEditorPage: Component rendered');
@@ -875,7 +901,7 @@ export default function CardEditorPage() {
     if (!nameToUse) {
       const cardName = prompt('กรุณาใส่ชื่อนามบัตร:', '');
       if (!cardName || cardName.trim() === '') {
-        alert('กรุณาใส่ชื่อนามบัตร');
+        toast.error('กรุณาใส่ชื่อนามบัตร');
         return;
       }
       nameToUse = cardName.trim();
@@ -911,12 +937,12 @@ export default function CardEditorPage() {
       // Use businessCards.create from Supabase client
       const result = await businessCards.create(cardData);
       setFormData(prev => ({ ...prev, id: (result as any).id }));
-      alert('บันทึกข้อมูลเรียบร้อยแล้ว');
+      toast.success('บันทึกข้อมูลเรียบร้อยแล้ว');
       // Redirect to dashboard to show the newly created card
       router.push('/dashboard');
     } catch (error) {
       console.error('Error saving card:', error);
-      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsLoading(false);
     }
@@ -951,12 +977,12 @@ export default function CardEditorPage() {
       
       // Use businessCards.update from Supabase client
       await businessCards.update(formData.id, updateData);
-      alert('อัปเดตข้อมูลเรียบร้อยแล้ว');
+      toast.success('อัปเดตข้อมูลเรียบร้อยแล้ว');
       // Redirect to dashboard after update
       router.push('/dashboard');
     } catch (error) {
       console.error('Error updating card:', error);
-      alert('เกิดข้อผิดพลาดในการอัปเดตข้อมูล: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      toast.error('เกิดข้อผิดพลาดในการอัปเดตข้อมูล: ' + (error instanceof Error ? error.message : 'Unknown error'));
     } finally {
       setIsLoading(false);
     }

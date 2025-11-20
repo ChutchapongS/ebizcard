@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, stopConnectionMonitor } from '@/lib/supabase/client';
+import toast from 'react-hot-toast';
 
 interface AuthContextType {
   user: User | null;
@@ -422,14 +423,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       if (error && error.message.includes('provider is not enabled')) {
         // Show user-friendly message
-        alert('Google OAuth ยังไม่ได้เปิดใช้งาน กรุณาใช้การเข้าสู่ระบบด้วยอีเมลแทน');
+        toast.error('Google OAuth ยังไม่ได้เปิดใช้งาน กรุณาใช้การเข้าสู่ระบบด้วยอีเมลแทน');
         return { data: null, error: { message: 'Google OAuth not enabled' } };
       }
       
       return { data, error };
     } catch (error) {
       console.error('Google OAuth error:', error);
-      alert('เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google');
+      toast.error('เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Google');
       return { data: null, error };
     }
   };
@@ -448,14 +449,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       if (error && error.message.includes('provider is not enabled')) {
         // Show user-friendly message
-        alert('LinkedIn OAuth ยังไม่ได้เปิดใช้งาน กรุณาใช้การเข้าสู่ระบบด้วยอีเมลแทน');
+        toast.error('LinkedIn OAuth ยังไม่ได้เปิดใช้งาน กรุณาใช้การเข้าสู่ระบบด้วยอีเมลแทน');
         return { data: null, error: { message: 'LinkedIn OAuth not enabled' } };
       }
       
       return { data, error };
     } catch (error) {
       console.error('LinkedIn OAuth error:', error);
-      alert('เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย LinkedIn');
+      toast.error('เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย LinkedIn');
       return { data: null, error };
     }
   };
