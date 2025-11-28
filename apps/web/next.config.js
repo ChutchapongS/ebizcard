@@ -1,4 +1,11 @@
 /** @type {import('next').NextConfig} */
+const envVars = {
+  CUSTOM_KEY: process.env.CUSTOM_KEY || '',
+};
+
+const buildOutput = process.env.NEXT_BUILD_OUTPUT;
+const enableStandalone = buildOutput === 'standalone';
+
 const nextConfig = {
   images: {
     domains: [
@@ -10,11 +17,9 @@ const nextConfig = {
       'media.licdn.com',
     ].filter(Boolean),
   },
-  output: 'standalone',
+  ...(enableStandalone ? { output: 'standalone' } : {}),
   trailingSlash: false,
-  env: {
-    CUSTOM_KEY: process.env.CUSTOM_KEY,
-  },
+  env: envVars,
   webpack: (config, { isServer, webpack }) => {
     // Prevent DOMPurify from being bundled on server-side
     if (isServer) {

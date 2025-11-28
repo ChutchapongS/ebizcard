@@ -16,6 +16,7 @@ interface AuthContextType {
   signOut: () => Promise<{ error: any }>;
   signInWithGoogle: () => Promise<{ data: any; error: any }>;
   signInWithLinkedIn: () => Promise<{ data: any; error: any }>;
+  signInWithAzure: () => Promise<{ data: any; error: any }>;
   resetPassword: (email: string) => Promise<{ data: any; error: any }>;
   updateProfile: (updates: { 
     full_name?: string; 
@@ -104,6 +105,23 @@ const hasValidSupabaseCredentials = () => {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.length > 50;
 };
 
+const persistUserToStorage = (user: User | null) => {
+  if (typeof window === 'undefined') return;
+
+  if (user) {
+    const minimalUser = {
+      id: user.id,
+      email: user.email,
+      role: (user.user_metadata as any)?.role,
+      department: (user.user_metadata as any)?.department,
+      metadata: user.user_metadata,
+    };
+    localStorage.setItem('user', JSON.stringify(minimalUser));
+  } else {
+    localStorage.removeItem('user');
+  }
+};
+
 /**
  * React Component: AuthProvider
  * 
@@ -164,9 +182,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         
         if (isMounted) {
           setSession(session);
-          setUser(session?.user || null);
+          const supabaseUser = session?.user || null;
+          setUser(supabaseUser);
           setIsConnected(true);
           setIsLoading(false);
+          persistUserToStorage(supabaseUser);
         }
       } catch (error) {
         console.error('Failed to get initial session:', error);
@@ -201,18 +221,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (event === 'SIGNED_OUT') {
           setSession(null);
           setUser(null);
+          persistUserToStorage(null);
           setIsConnected(false);
           setIsLoading(false);
           setIsLoggingOut(false); // Reset logging out state
         } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           setSession(session);
           setUser(session?.user || null);
+          persistUserToStorage(session?.user || null);
           setIsConnected(true);
           setIsLoading(false);
           setIsLoggingOut(false); // Reset logging out state
         } else {
           setSession(session);
           setUser(session?.user || null);
+          persistUserToStorage(session?.user || null);
           setIsConnected(true);
           setIsLoading(false);
           setIsLoggingOut(false); // Reset logging out state
@@ -291,6 +314,32 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  /**
+   * Helper: redirect to SCGJWD user portal logout to clear central session.
+   */
+  const redirectToUserPortalLogout = () => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const userPortalUrl = process.env.NEXT_PUBLIC_USER_PORTAL_URL;
+    const userPortalClientId =
+      process.env.NEXT_PUBLIC_USER_PORTAL_CLIENT_ID || 'e-BizCard';
+    const fallbackUrl = `${window.location.origin}/auth/login`;
+
+    if (!userPortalUrl) {
+      window.location.href = fallbackUrl;
+      return;
+    }
+
+    const normalizedPortalUrl = userPortalUrl.replace(/\/$/, '');
+    const logoutUrl = `${normalizedPortalUrl}/logout?client_id=${encodeURIComponent(
+      userPortalClientId,
+    )}&return_uri=${encodeURIComponent(fallbackUrl)}`;
+
+    window.location.href = logoutUrl;
+  };
+
   const signOut = async () => {
     try {
       // Set logging out flag FIRST to prevent auth state changes
@@ -303,7 +352,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setIsLoading(false);
       
       // Clear localStorage and sessionStorage
-      localStorage.removeItem('user');
+      persistUserToStorage(null);
       localStorage.removeItem('redirect-after-reload');
       localStorage.clear();
       sessionStorage.clear();
@@ -347,6 +396,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         await supabase?.auth.signOut({ scope: 'global' });
         
         // Clear all storage
+        persistUserToStorage(null);
         localStorage.clear();
         sessionStorage.clear();
         
@@ -368,7 +418,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       // Reset logging out flag immediately
       setIsLoggingOut(false);
-      
+
+      // Redirect to user portal logout to clear SSO session
+      redirectToUserPortalLogout();
+
       return { error: null };
     } catch (error) {
       console.error('Error signing out:', error);
@@ -382,6 +435,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       stopConnectionMonitor();
       
       // Clear all storage and session
+      persistUserToStorage(null);
       localStorage.clear();
       sessionStorage.clear();
       
@@ -404,7 +458,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       // Reset logging out flag immediately
       setIsLoggingOut(false);
-      
+
+      // Attempt to redirect to user portal logout even when Supabase fails
+      redirectToUserPortalLogout();
+
       return { error: null };
     }
   };
@@ -457,6 +514,31 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } catch (error) {
       console.error('LinkedIn OAuth error:', error);
       toast.error('เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย LinkedIn');
+      return { data: null, error };
+    }
+  };
+
+  const signInWithAzure = async () => {
+    try {
+      const result = await supabase?.auth.signInWithOAuth({
+        provider: 'azure',
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`,
+        },
+      });
+      
+      const data = result?.data || null;
+      const error = result?.error || null;
+      
+      if (error && error.message.includes('provider is not enabled')) {
+        toast.error('Azure AD OAuth ยังไม่ได้เปิดใช้งาน กรุณาใช้การเข้าสู่ระบบด้วยอีเมลแทน');
+        return { data: null, error: { message: 'Azure AD OAuth not enabled' } };
+      }
+      
+      return { data, error };
+    } catch (error) {
+      console.error('Azure AD OAuth error:', error);
+      toast.error('เกิดข้อผิดพลาดในการเข้าสู่ระบบด้วย Microsoft');
       return { data: null, error };
     }
   };
@@ -735,6 +817,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         signOut,
         signInWithGoogle,
         signInWithLinkedIn,
+        signInWithAzure,
         resetPassword,
         updateProfile,
       };

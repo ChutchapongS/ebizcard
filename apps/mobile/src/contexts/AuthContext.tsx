@@ -8,6 +8,7 @@ interface AuthContextType extends AuthState {
   signIn: (email: string, password: string) => Promise<{ data: any; error: any }>;
   signInWithGoogle: () => Promise<{ data: any; error: any }>;
   signInWithLinkedIn: () => Promise<{ data: any; error: any }>;
+  signInWithAzure: () => Promise<{ data: any; error: any }>;
   signOut: () => Promise<{ error: any }>;
 }
 
@@ -72,6 +73,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return await auth.signInWithLinkedIn();
   };
 
+  const signInWithAzure = async () => {
+    return await auth.signInWithAzure();
+  };
+
   const signOut = async () => {
     return await auth.signOut();
   };
@@ -84,6 +89,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signIn,
     signInWithGoogle,
     signInWithLinkedIn,
+    signInWithAzure,
     signOut,
   };
 

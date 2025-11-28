@@ -8,16 +8,18 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import Constants from 'expo-constants';
 
 const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { signIn, signInWithGoogle, signInWithLinkedIn } = useAuth();
+  const { signIn } = useAuth();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -38,31 +40,37 @@ const LoginScreen = ({ navigation }: any) => {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    try {
-      const { error } = await signInWithGoogle();
-      if (error) {
-        Alert.alert('ข้อผิดพลาด', error.message);
-      }
-    } catch (error) {
-      Alert.alert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
-    } finally {
-      setIsLoading(false);
+  const handleSCGJWDLogin = async () => {
+    // Get user portal config from environment variables / Expo config
+    const userPortalUrl =
+      Constants.expoConfig?.extra?.userPortalUrl || process.env.EXPO_PUBLIC_USER_PORTAL_URL;
+    const userPortalClientId =
+      Constants.expoConfig?.extra?.userPortalClientId || process.env.EXPO_PUBLIC_USER_PORTAL_CLIENT_ID || 'e-BizCard';
+    
+    if (!userPortalUrl) {
+      Alert.alert('ข้อผิดพลาด', 'SCGJWD User Portal URL ยังไม่ได้ตั้งค่า กรุณาติดต่อผู้ดูแลระบบ');
+      return;
     }
-  };
 
-  const handleLinkedInLogin = async () => {
-    setIsLoading(true);
+    const normalizedPortalUrl = userPortalUrl.replace(/\/$/, '');
+
+    // Deep link callback (custom scheme)
+    const appReturnUrl = 'ebizcard://dashboard';
+    const callbackUri = `ebizcard://auth/callback?returnUrl=${encodeURIComponent(appReturnUrl)}`;
+
+    const loginUrl = `${normalizedPortalUrl}/login?client_id=${encodeURIComponent(
+      userPortalClientId,
+    )}&redirect_uri=${encodeURIComponent(callbackUri)}`;
+    
     try {
-      const { error } = await signInWithLinkedIn();
-      if (error) {
-        Alert.alert('ข้อผิดพลาด', error.message);
+      const canOpen = await Linking.canOpenURL(loginUrl);
+      if (canOpen) {
+        await Linking.openURL(loginUrl);
+      } else {
+        Alert.alert('ข้อผิดพลาด', 'ไม่สามารถเปิด SCGJWD User Portal ได้');
       }
     } catch (error) {
-      Alert.alert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ');
-    } finally {
-      setIsLoading(false);
+      Alert.alert('ข้อผิดพลาด', 'เกิดข้อผิดพลาดในการเปิด SCGJWD User Portal');
     }
   };
 
@@ -122,30 +130,18 @@ const LoginScreen = ({ navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            {/* Social Login */}
+            {/* SCGJWD User Portal */}
             <View className="mt-8">
-              <Text className="text-center text-gray-500 mb-4">หรือเข้าสู่ระบบด้วย</Text>
+              <Text className="text-center text-gray-500 mb-4">หรือ</Text>
               
               <TouchableOpacity
-                className="border border-gray-300 rounded-lg py-4 items-center mb-3"
-                onPress={handleGoogleLogin}
+                className="bg-orange-500 rounded-lg py-4 items-center"
+                onPress={handleSCGJWDLogin}
                 disabled={isLoading}
               >
-                <View className="flex-row items-center">
-                  <Ionicons name="logo-google" size={20} color="#DB4437" />
-                  <Text className="text-gray-700 ml-2 font-medium">Google</Text>
-                </View>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                className="border border-gray-300 rounded-lg py-4 items-center"
-                onPress={handleLinkedInLogin}
-                disabled={isLoading}
-              >
-                <View className="flex-row items-center">
-                  <Ionicons name="logo-linkedin" size={20} color="#0077B5" />
-                  <Text className="text-gray-700 ml-2 font-medium">LinkedIn</Text>
-                </View>
+                <Text className="text-white text-lg font-semibold">
+                  SCGJWD User Portal
+                </Text>
               </TouchableOpacity>
             </View>
 

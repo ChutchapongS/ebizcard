@@ -45,6 +45,12 @@ export const auth = {
     });
   },
 
+  signInWithAzure: async () => {
+    return await supabase.auth.signInWithOAuth({
+      provider: 'azure',
+    });
+  },
+
   signOut: async () => {
     return await supabase.auth.signOut();
   },
