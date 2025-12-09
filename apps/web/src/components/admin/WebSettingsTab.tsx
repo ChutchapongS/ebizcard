@@ -22,6 +22,7 @@ import { GradientEditor } from './GradientEditor';
 import { RichTextEditor } from './RichTextEditor';
 import { sanitizeForInnerHTML } from '@/utils/sanitize';
 import toast from 'react-hot-toast';
+import { getWebSettings, saveWebSettings, uploadWebsiteLogo, uploadSlideImage, uploadFeatureIcon } from '@/lib/api-client';
 
 interface WebSettingsTabProps {
   userRole: string;
@@ -283,13 +284,7 @@ export default function WebSettingsTab({ userRole }: WebSettingsTabProps) {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/web-settings');
-      
-      if (!response.ok) {
-        throw new Error('Failed to load settings');
-      }
-      
-      const data = await response.json();
+      const data = await getWebSettings();
       
       if (data.success && data.settings) {
         const loadedSettings: WebSettings = { ...data.settings };
@@ -478,21 +473,13 @@ export default function WebSettingsTab({ userRole }: WebSettingsTabProps) {
         const formData = new FormData();
         formData.append('logo', logoFile);
         
-        const uploadResponse = await fetch('/api/admin/upload-website-logo', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session?.access_token}`,
-          },
-          body: formData,
-        });
+        const uploadResponse = await uploadWebsiteLogo(logoFile);
 
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json();
-          throw new Error(errorData.error || 'Failed to upload logo');
+        if (!uploadResponse.success) {
+          throw new Error(uploadResponse.error || 'Failed to upload logo');
         }
         
-        const uploadData = await uploadResponse.json();
-        updatedSettings.logo_url = uploadData.logo_url;
+        updatedSettings.logo_url = uploadResponse.url || uploadResponse.imageUrl;
         
         // Clear logo file after upload
         setLogoFile(null);
@@ -502,30 +489,18 @@ export default function WebSettingsTab({ userRole }: WebSettingsTabProps) {
       const updatedImageUrls: Record<string, string> = {};
       for (const [slideId, imageFile] of Object.entries(slideImages)) {
         if (imageFile) {
-          const formData = new FormData();
-          formData.append('slide_image', imageFile);
-          formData.append('slide_id', slideId);
-          
-          const uploadResponse = await fetch('/api/admin/upload-slide-image', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session?.access_token}`,
-            },
-            body: formData,
-          });
+          const uploadResponse = await uploadSlideImage(imageFile, slideId);
 
-          if (!uploadResponse.ok) {
-            const errorData = await uploadResponse.json();
-            throw new Error(errorData.error || `Failed to upload image for slide ${slideId}`);
+          if (!uploadResponse.success) {
+            throw new Error(uploadResponse.error || `Failed to upload image for slide ${slideId}`);
           }
           
-          const uploadData = await uploadResponse.json();
-          updatedImageUrls[slideId] = uploadData.image_url;
+          updatedImageUrls[slideId] = uploadResponse.url || uploadResponse.image_url;
           
           // Update the slide item with the new image URL
           setSliderItems((prev) =>
             prev.map((item) =>
-              item.id === slideId ? { ...item, image_url: uploadData.image_url } : item
+              item.id === slideId ? { ...item, image_url: uploadResponse.image_url } : item
             )
           );
         }
@@ -538,30 +513,18 @@ export default function WebSettingsTab({ userRole }: WebSettingsTabProps) {
       const updatedIconUrls: Record<string, string> = {};
       for (const [featureId, iconFile] of Object.entries(featureIcons)) {
         if (iconFile) {
-          const formData = new FormData();
-          formData.append('icon', iconFile);
-          formData.append('featureId', featureId);
-          
-          const uploadResponse = await fetch('/api/admin/upload-feature-icon', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session?.access_token}`,
-            },
-            body: formData,
-          });
+          const uploadResponse = await uploadFeatureIcon(iconFile, featureId);
 
-          if (!uploadResponse.ok) {
-            const errorData = await uploadResponse.json();
-            throw new Error(errorData.error || `Failed to upload icon for feature ${featureId}`);
+          if (!uploadResponse.success) {
+            throw new Error(uploadResponse.error || `Failed to upload icon for feature ${featureId}`);
           }
           
-          const uploadData = await uploadResponse.json();
-          updatedIconUrls[featureId] = uploadData.icon_url;
+          updatedIconUrls[featureId] = uploadResponse.icon_url;
           
           // Update the feature item with the new icon URL
           setFeatureItems((prev) =>
             prev.map((item) =>
-              item.id === featureId ? { ...item, icon_url: uploadData.icon_url } : item
+              item.id === featureId ? { ...item, icon_url: uploadResponse.icon_url } : item
             )
           );
         }
@@ -597,22 +560,12 @@ export default function WebSettingsTab({ userRole }: WebSettingsTabProps) {
       };
 
       // Save settings
-      const response = await fetch('/api/admin/web-settings', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ settings: payloadSettings }),
-      });
+      const response = await saveWebSettings(payloadSettings);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save settings');
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to save settings');
       }
 
-      const data = await response.json();
-      
       // Update local state
       setSettings(payloadSettings);
       

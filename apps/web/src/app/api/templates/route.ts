@@ -94,15 +94,21 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    const { name, paper, elements, user_id, preview_image } = body;
+    const { name, paper, elements, user_id, preview_image, user_type } = body;
     
     if (!name || !paper || !elements) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
     // Get user role for the template creator
+    // If user_type is provided in the request (e.g., when duplicating a system template),
+    // use it. Otherwise, get from profiles table.
     let userType = 'user'; // Default
-    if (user_id) {
+    if (user_type) {
+      // Use provided user_type (e.g., when duplicating a system template)
+      userType = user_type;
+    } else if (user_id) {
+      // Get user_type from profiles table
       try {
         const { data: profile } = await supabaseAdmin
           .from('profiles')

@@ -12,7 +12,6 @@ __tests__/
     └── api/
         ├── contact.test.ts           # Contact API tests
         ├── get-profile.test.ts       # Get Profile API tests
-        ├── update-profile.test.ts    # Update Profile API tests
         └── web-settings.test.ts      # Web Settings API tests
 ```
 
@@ -48,16 +47,10 @@ Helper functions สำหรับการทดสอบ API routes:
 - ✅ Error handling: Missing addresses (graceful)
 - ✅ Parse addresses จาก profile table
 
-### Update Profile API (`/api/update-profile`)
-
-- ✅ อัปเดต profile สำเร็จ
-- ✅ Validation: Missing userId
-- ✅ Validation: Missing updates
-- ✅ Validation: Payload size limit
-- ✅ Exclude avatar_url และ profile_image จาก metadata
-- ✅ Error handling: Database errors
-- ✅ CORS: OPTIONS preflight request
-- ✅ Error handling: Missing service role key
+> ℹ️ **Update Profile API**
+>
+> เส้นทางนี้ถูกย้ายไป Supabase Edge Functions (`supabase/functions/update-profile`) เพื่อรองรับ static export แล้ว
+> จึงไม่มี integration test ฝั่ง Next.js อีกต่อไป หากต้องการทดสอบให้ใช้ Supabase CLI (`supabase functions serve`) และเครื่องมือภายนอก เช่น Postman
 
 ### Web Settings API (`/api/admin/web-settings`)
 

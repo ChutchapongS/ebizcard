@@ -21,6 +21,7 @@ import WebSettingsTab from '@/components/admin/WebSettingsTab';
 import UserManagementTab from '@/components/admin/UserManagementTab';
 import MenuVisibilityTab from '@/components/admin/MenuVisibilityTab';
 import LevelCapabilityTab from '@/components/admin/LevelCapabilityTab';
+import { getProfile } from '@/lib/api-client';
 
 type TabType = 'web-settings' | 'user-management' | 'menu-visibility' | 'level-capability';
 
@@ -40,17 +41,7 @@ export default function AdminPage() {
       }
 
       try {
-        const response = await fetch('/api/get-profile', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            access_token: session.access_token,
-          }),
-        });
-
-        const result = await response.json();
+        const result = await getProfile();
 
         if (result.success && result.profile) {
           const role = result.profile.user_type || 'user';

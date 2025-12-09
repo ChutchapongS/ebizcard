@@ -14,6 +14,7 @@ import {
   Menu,
   X
 } from 'lucide-react';
+import { getProfile, getWebSettings, getMenuVisibility } from '@/lib/api-client';
 
 interface User {
   id: string;
@@ -53,24 +54,20 @@ export const Navbar = () => {
   useEffect(() => {
     const loadWebsiteSettings = async () => {
       try {
-        const response = await fetch('/api/admin/web-settings');
+        const data = await getWebSettings();
         
-        if (response.ok) {
-          const data = await response.json();
-          
-          if (data.success && data.settings) {
-            if (data.settings.logo_url) {
-              setWebsiteLogo(data.settings.logo_url);
-            }
-            if (data.settings.site_name) {
-              setSiteName(data.settings.site_name);
-            }
-            if (data.settings.navbar_color) {
-              setNavbarColor(data.settings.navbar_color);
-            }
-            if (data.settings.navbar_font_color) {
-              setNavbarFontColor(data.settings.navbar_font_color);
-            }
+        if (data.success && data.settings) {
+          if (data.settings.logo_url) {
+            setWebsiteLogo(data.settings.logo_url);
+          }
+          if (data.settings.site_name) {
+            setSiteName(data.settings.site_name);
+          }
+          if (data.settings.navbar_color) {
+            setNavbarColor(data.settings.navbar_color);
+          }
+          if (data.settings.navbar_font_color) {
+            setNavbarFontColor(data.settings.navbar_font_color);
           }
         }
       } catch (error) {
@@ -100,23 +97,7 @@ export const Navbar = () => {
       if (!authUser?.id) return;
       
       try {
-        const { supabase } = await import('@/lib/supabase/client');
-        if (!supabase) return;
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (!session?.access_token) return;
-        
-        const response = await fetch('/api/get-profile', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            access_token: session.access_token,
-          }),
-        });
-        
-        const result = await response.json();
+        const result = await getProfile();
         
         if (result.success && result.profile) {
           // Load profile image
@@ -161,21 +142,17 @@ export const Navbar = () => {
       // Reload settings when user is authenticated
       const loadWebsiteSettings = async () => {
         try {
-          const response = await fetch('/api/admin/web-settings');
+          const data = await getWebSettings();
           
-          if (response.ok) {
-            const data = await response.json();
-            
-            if (data.success && data.settings) {
-              if (data.settings.logo_url) {
-                setWebsiteLogo(data.settings.logo_url);
-              }
-              if (data.settings.site_name) {
-                setSiteName(data.settings.site_name);
-              }
-              if (data.settings.navbar_color) {
-                setNavbarColor(data.settings.navbar_color);
-              }
+          if (data.success && data.settings) {
+            if (data.settings.logo_url) {
+              setWebsiteLogo(data.settings.logo_url);
+            }
+            if (data.settings.site_name) {
+              setSiteName(data.settings.site_name);
+            }
+            if (data.settings.navbar_color) {
+              setNavbarColor(data.settings.navbar_color);
             }
           }
         } catch (error) {
@@ -186,24 +163,10 @@ export const Navbar = () => {
       // Load menu visibility settings
       const loadMenuVisibility = async () => {
         try {
-          const { supabase } = await import('@/lib/supabase/client');
-          if (!supabase) return;
+          const data = await getMenuVisibility();
           
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session?.access_token) return;
-
-          const response = await fetch('/api/menu-visibility', {
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-          });
-
-          if (response.ok) {
-            const data = await response.json();
-            
-            if (data.success && data.menuVisibility) {
-              setMenuVisibility(data.menuVisibility);
-            }
+          if (data.success && data.settings) {
+            setMenuVisibility(data.settings);
           }
         } catch (error) {
           console.warn('Navbar: Error loading menu visibility:', error);

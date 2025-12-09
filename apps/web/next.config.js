@@ -5,18 +5,41 @@ const envVars = {
 
 const buildOutput = process.env.NEXT_BUILD_OUTPUT;
 const enableStandalone = buildOutput === 'standalone';
+// EC2 deploy: default to server build (static export disabled)
+const enableStaticExport = false;
+
+// Helper function to extract hostname from URL
+const getHostname = (url) => {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return null;
+  }
+};
 
 const nextConfig = {
+  // Images configuration for server build
   images: {
-    domains: [
-      // Extract domain from Supabase URL (remove https:// and path)
+    // Use remotePatterns instead of domains (Next.js 13+)
+    remotePatterns: [
       ...(process.env.NEXT_PUBLIC_SUPABASE_URL
-        ? [process.env.NEXT_PUBLIC_SUPABASE_URL.replace(/^https?:\/\//, '').split('/')[0]]
+        ? [{
+            protocol: 'https',
+            hostname: getHostname(process.env.NEXT_PUBLIC_SUPABASE_URL),
+          }].filter(p => p.hostname)
         : []),
-      'lh3.googleusercontent.com',
-      'media.licdn.com',
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'media.licdn.com',
+      },
     ].filter(Boolean),
   },
+  
+  // Standalone output when requested
   ...(enableStandalone ? { output: 'standalone' } : {}),
   trailingSlash: false,
   env: envVars,
@@ -36,6 +59,7 @@ const nextConfig = {
         })
       );
     }
+    
     return config;
   },
   async headers() {

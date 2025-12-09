@@ -1,21 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { rateLimit, RATE_LIMIT_CONFIGS, addRateLimitHeaders } from '@/lib/rate-limit';
+import { createClient } from '@/lib/supabase/server';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL ||
-  process.env.SITE_URL ||
-  'http://localhost:3000';
-const USE_SUPABASE_FUNCTION =
-  process.env.NEXT_PUBLIC_USE_SUPABASE_QR === 'true' ||
-  process.env.USE_SUPABASE_QR === 'true';
+// Fallback: Generate QR code directly if Edge Function fails
+async function generateQRCodeFallback(cardId: string, publicUrl: string) {
+  try {
+    // Try to use qrcode library if available
+    const QRCode = await import('qrcode').catch(() => null);
+    
+    if (QRCode && QRCode.default) {
+      const qrCodeDataUrl = await QRCode.default.toDataURL(publicUrl, {
+        width: 256,
+        margin: 2,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+      });
+      return qrCodeDataUrl;
+    }
+    
+    // If qrcode library is not available, return null to indicate fallback failed
+    return null;
+  } catch (error) {
+    console.error('Error in QR code fallback generation:', error);
+    return null;
+  }
+}
 
 export async function POST(request: NextRequest) {
-  const rateLimitResponse = rateLimit(request, RATE_LIMIT_CONFIGS.standard);
-  if (rateLimitResponse) return rateLimitResponse;
-
   try {
     const { cardId } = await request.json();
 
@@ -26,121 +38,107 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      console.error('Supabase configuration missing');
-      return NextResponse.json(
-        { error: 'Server configuration error' },
-        { status: 500 }
-      );
-    }
+    // Create Supabase client with user's session
+    const supabase = createClient();
 
-    // Attempt to use Supabase Edge Function first (if enabled)
-    if (USE_SUPABASE_FUNCTION) {
-      try {
-        const functionUrl = `${SUPABASE_URL}/functions/v1/generate-qr`;
-        const functionKey = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+    // Get the card to verify it exists and get the public URL
+    const { data: card, error: cardError } = await supabase
+      .from('business_cards')
+      .select('id, name, job_title, company')
+      .eq('id', cardId)
+      .single();
 
-        const functionResponse = await fetch(functionUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': functionKey,
-            'Authorization': `Bearer ${functionKey}`,
-          },
-          body: JSON.stringify({ cardId }),
-        });
-
-        const result = await functionResponse.json();
-        if (functionResponse.ok && result?.success) {
-          const response = NextResponse.json(result, {
-            status: functionResponse.status,
-          });
-          return addRateLimitHeaders(response, request);
-        }
-
-        console.warn(
-          'Supabase generate-qr function failed, falling back to local generation:',
-          { status: functionResponse.status, body: result }
-        );
-      } catch (functionError) {
-        console.warn(
-          'Supabase generate-qr function error, falling back to local generation:',
-          functionError
-        );
-      }
-    }
-
-    // Fallback: verify card exists via Supabase REST and generate locally
-    const cardResponse = await fetch(
-      `${SUPABASE_URL}/rest/v1/business_cards?select=id,name,job_title,company&id=eq.${cardId}`,
-      {
-        method: 'GET',
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
-    if (!cardResponse.ok) {
-      console.error('Failed to fetch card:', cardResponse.status);
-      return NextResponse.json(
-        { error: 'Failed to fetch card data' },
-        { status: cardResponse.status }
-      );
-    }
-
-    const cardData = await cardResponse.json();
-    const card = cardData[0];
-
-    if (!card) {
-      console.error('Card not found');
+    if (cardError || !card) {
+      console.error('Card not found:', cardError);
       return NextResponse.json(
         { error: 'Card not found' },
         { status: 404 }
       );
     }
 
-    const normalizedSiteUrl = SITE_URL.replace(/\/$/, '');
-    const publicUrl = `${normalizedSiteUrl}/card/${cardId}`;
+    // Type assertion for card (Supabase types may not include business_cards table)
+    const cardData = card as { id: string; name: string; job_title: string; company: string };
+
+    // Generate the public URL for the card
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : 'http://localhost:3000';
+    const publicUrl = `${siteUrl}/card/${cardId}`;
+
+    // Try to invoke the Edge Function first
+    let qrCodeDataUrl: string | null = null;
+    let edgeFunctionError: any = null;
 
     try {
-      const { default: QRCode } = await import('qrcode');
-
-      const qrCodeDataUrl = await QRCode.toDataURL(publicUrl, {
-        width: 256,
-        margin: 2,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF',
-        },
+      const { data, error } = await supabase.functions.invoke('generate-qr', {
+        body: { cardId },
       });
 
-      const response = NextResponse.json({
-        success: true,
-        qrCode: qrCodeDataUrl,
-        publicUrl,
-        card: {
-          id: card.id,
-          name: card.name,
-          job_title: card.job_title,
-          company: card.company,
-        },
-      });
-      return addRateLimitHeaders(response, request);
-    } catch (qrError) {
-      console.error('QR Code generation error:', qrError);
-      return NextResponse.json(
-        { error: 'Failed to generate QR code' },
-        { status: 500 }
-      );
+      if (!error && data && data.qrCode) {
+        qrCodeDataUrl = data.qrCode;
+      } else {
+        edgeFunctionError = error;
+        console.warn('Edge Function failed, trying fallback:', error);
+      }
+    } catch (error) {
+      edgeFunctionError = error;
+      console.warn('Edge Function invocation failed, trying fallback:', error);
     }
+
+    // Fallback: Generate QR code directly if Edge Function failed
+    if (!qrCodeDataUrl) {
+      qrCodeDataUrl = await generateQRCodeFallback(cardId, publicUrl);
+      
+      if (!qrCodeDataUrl) {
+        console.error('Both Edge Function and fallback failed');
+        return NextResponse.json(
+          { 
+            error: 'Failed to generate QR code', 
+            details: edgeFunctionError?.message || 'QR code generation unavailable'
+          },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Track the QR code generation (optional, can fail silently)
+    try {
+      await (supabase
+        .from('card_views') as any)
+        .insert({
+          card_id: cardId,
+          viewer_ip: request.headers.get('x-forwarded-for') || 'unknown',
+          device_info: 'QR Code Generated',
+        });
+    } catch (trackError) {
+      // Log but don't fail the request
+      console.warn('Failed to track QR code generation:', trackError);
+    }
+    
+    // Return the response in the format expected by DashboardContent
+    return NextResponse.json({
+      success: true,
+      qrCode: qrCodeDataUrl,
+      publicUrl,
+      card: {
+        id: cardData.id,
+        name: cardData.name,
+        job_title: cardData.job_title,
+        company: cardData.company,
+      },
+    });
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('Error in generate-qr route:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error('Error details:', { errorMessage, errorStack });
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error', 
+        details: errorMessage 
+      },
       { status: 500 }
     );
   }
 }
+

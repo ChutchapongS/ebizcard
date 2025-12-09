@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { getWebSettings } from '@/lib/api-client';
 import Link from 'next/link';
 import { Mail, Phone, MapPin, X } from 'lucide-react';
 import { sanitizeForInnerHTML } from '@/utils/sanitize';
@@ -48,52 +49,48 @@ export const Footer = () => {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await fetch('/api/admin/web-settings');
+        const data = await getWebSettings();
         
-        if (response.ok) {
-          const data = await response.json();
-          
-          if (data.success && data.settings) {
-            if (data.settings.footer_color) {
-              setFooterColor(data.settings.footer_color);
-            }
-            if (data.settings.footer_font_color) {
-              setFooterFontColor(data.settings.footer_font_color);
-            }
-            if (data.settings.site_name) {
-              setSiteName(data.settings.site_name);
-            }
-            if (data.settings.site_description) {
-              setSiteDescription(data.settings.site_description);
-            }
-            if (data.settings.contact_email) {
-              setContactEmail(data.settings.contact_email);
-            }
-            if (data.settings.contact_phone) {
-              setContactPhone(data.settings.contact_phone);
-            }
-            if (data.settings.contact_address) {
-              setContactAddress(data.settings.contact_address);
-            }
-            if (data.settings.social_line) {
-              setSocialLine(data.settings.social_line);
-            }
-            if (data.settings.social_facebook) {
-              setSocialFacebook(data.settings.social_facebook);
-            }
-            if (data.settings.social_youtube) {
-              setSocialYoutube(data.settings.social_youtube);
-            }
-            if (data.settings.privacy_policy) {
-              setPrivacyPolicy(data.settings.privacy_policy);
-            } else {
-              setPrivacyPolicy('');
-            }
-            if (data.settings.terms_of_service) {
-              setTermsOfService(data.settings.terms_of_service);
-            } else {
-              setTermsOfService('');
-            }
+        if (data.success && data.settings) {
+          if (data.settings.footer_color) {
+            setFooterColor(data.settings.footer_color);
+          }
+          if (data.settings.footer_font_color) {
+            setFooterFontColor(data.settings.footer_font_color);
+          }
+          if (data.settings.site_name) {
+            setSiteName(data.settings.site_name);
+          }
+          if (data.settings.site_description) {
+            setSiteDescription(data.settings.site_description);
+          }
+          if (data.settings.contact_email) {
+            setContactEmail(data.settings.contact_email);
+          }
+          if (data.settings.contact_phone) {
+            setContactPhone(data.settings.contact_phone);
+          }
+          if (data.settings.contact_address) {
+            setContactAddress(data.settings.contact_address);
+          }
+          if (data.settings.social_line) {
+            setSocialLine(data.settings.social_line);
+          }
+          if (data.settings.social_facebook) {
+            setSocialFacebook(data.settings.social_facebook);
+          }
+          if (data.settings.social_youtube) {
+            setSocialYoutube(data.settings.social_youtube);
+          }
+          if (data.settings.privacy_policy) {
+            setPrivacyPolicy(data.settings.privacy_policy);
+          } else {
+            setPrivacyPolicy('');
+          }
+          if (data.settings.terms_of_service) {
+            setTermsOfService(data.settings.terms_of_service);
+          } else {
+            setTermsOfService('');
           }
         }
       } catch (error) {
@@ -116,7 +113,7 @@ export const Footer = () => {
   }, []);
 
   return (
-    <footer 
+    <footer
       style={{
         background: footerColor?.startsWith('linear-gradient')
           ? footerColor
@@ -208,17 +205,14 @@ export const Footer = () => {
               onClick={async () => {
                 // Reload settings when opening modal to ensure latest data
                 try {
-                  const response = await fetch('/api/admin/web-settings');
-                  if (response.ok) {
-                    const data = await response.json();
-                    if (data.success && data.settings?.terms_of_service) {
-                      const termsContent = data.settings.terms_of_service;
-                      setTermsOfService(termsContent);
-                      setModalTermsContent(termsContent);
-                    } else {
-                      setTermsOfService('');
-                      setModalTermsContent('');
-                    }
+                  const data = await getWebSettings();
+                  if (data.success && data.settings?.terms_of_service) {
+                    const termsContent = data.settings.terms_of_service;
+                    setTermsOfService(termsContent);
+                    setModalTermsContent(termsContent);
+                  } else {
+                    setTermsOfService('');
+                    setModalTermsContent('');
                   }
                 } catch (error) {
                   console.warn('Modal: Error reloading terms of service:', error);
@@ -234,17 +228,14 @@ export const Footer = () => {
               onClick={async () => {
                 // Reload settings when opening modal to ensure latest data
                 try {
-                  const response = await fetch('/api/admin/web-settings');
-                  if (response.ok) {
-                    const data = await response.json();
-                    if (data.success && data.settings?.privacy_policy) {
-                      const policyContent = data.settings.privacy_policy;
-                      setPrivacyPolicy(policyContent);
-                      setModalPrivacyContent(policyContent);
-                    } else {
-                      setPrivacyPolicy('');
-                      setModalPrivacyContent('');
-                    }
+                  const data = await getWebSettings();
+                  if (data.success && data.settings?.privacy_policy) {
+                    const policyContent = data.settings.privacy_policy;
+                    setPrivacyPolicy(policyContent);
+                    setModalPrivacyContent(policyContent);
+                  } else {
+                    setPrivacyPolicy('');
+                    setModalPrivacyContent('');
                   }
                 } catch (error) {
                   console.warn('Modal: Error reloading privacy policy:', error);

@@ -549,9 +549,9 @@ export function DraggableElement({
                 src={
                   (element.field && userData) 
                     ? (element.field === 'profileImage'
-                        ? (userData?.avatar_url || userData?.user_metadata?.avatar_url)
+                        ? (userData?.profileImage || userData?.avatar_url || userData?.user_metadata?.avatar_url || userData?.user_metadata?.profile_image || '')
                         : element.field === 'companyLogo'
-                          ? (userData?.user_metadata?.company_logo)
+                          ? (userData?.companyLogo || userData?.user_metadata?.company_logo || '')
                           : element.imageUrl)
                     : element.imageUrl || ''
                 } 

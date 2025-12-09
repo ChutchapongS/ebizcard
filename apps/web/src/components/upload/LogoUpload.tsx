@@ -34,21 +34,9 @@ export const LogoUpload = ({ currentLogoUrl, onLogoChange, onRemove }: LogoUploa
     setUploadError(null);
 
     try {
-      // Create FormData
-      const formData = new FormData();
-      formData.append('logo', file);
-
-      // Upload to API
-      const response = await fetch('/api/upload-logo', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const result = await response.json();
+      // Use Edge Function
+      const { uploadLogo } = await import('@/lib/api-client');
+      const result = await uploadLogo(file, 'logo');
       onLogoChange(result.url);
     } catch (error) {
       console.error('Upload error:', error);

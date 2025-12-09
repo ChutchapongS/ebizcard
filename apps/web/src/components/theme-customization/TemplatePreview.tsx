@@ -423,6 +423,7 @@ const TemplatePreview = memo(function TemplatePreview({ template, userData, scal
       'อีเมลที่ทำงาน': 'your email',
       'อีเมลส่วนตัว': 'your email',
       'ชื่อบริษัท': 'your company',
+      'ชื่อบริษัท (ไทย)': 'your company (Thai)',
       'แผนก': 'your department',
       'เว็บไซต์': 'your website'
     };

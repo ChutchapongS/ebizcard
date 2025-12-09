@@ -7,14 +7,27 @@ import ConnectionStatus from '@/components/ConnectionStatus';
 const inter = Inter({ subsets: ['latin'] });
 
 // Get base URL from environment or default to localhost for development
-const metadataBase = process.env.NEXT_PUBLIC_SITE_URL 
-  ? new URL(process.env.NEXT_PUBLIC_SITE_URL)
-  : process.env.NODE_ENV === 'production'
-  ? new URL('https://ebizcard.app') // Fallback for production
-  : new URL('http://localhost:3000'); // Development default
+// Handle URL parsing safely for static export compatibility
+const getMetadataBase = (): URL | undefined => {
+  try {
+    if (process.env.NEXT_PUBLIC_SITE_URL) {
+      return new URL(process.env.NEXT_PUBLIC_SITE_URL);
+    }
+    if (process.env.NODE_ENV === 'production') {
+      return new URL('https://ebizcard.app'); // Fallback for production
+    }
+    return new URL('http://localhost:3000'); // Development default
+  } catch (error) {
+    // If URL parsing fails, return undefined (metadataBase is optional)
+    console.warn('Failed to parse metadataBase URL:', error);
+    return undefined;
+  }
+};
+
+const metadataBase = getMetadataBase();
 
 export const metadata: Metadata = {
-  metadataBase,
+  ...(metadataBase ? { metadataBase } : {}),
   title: 'e-BizCard - Digital Business Card Platform',
   description: 'สร้างและแชร์นามบัตรดิจิทัลของคุณได้อย่างง่ายดาย',
   keywords: 'digital business card, นามบัตรดิจิทัล, QR code, contact sharing',

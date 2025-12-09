@@ -369,21 +369,18 @@ export const businessCards = {
         return [];
       }
       
-      // Use proxy API to avoid CORS issues
-      const response = await fetch(`/api/supabase-proxy?table=business_cards&select=*&user_id=${userId}&order=created_at.desc`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Use Supabase client directly instead of proxy
+      const { data, error } = await supabase!
+        .from('business_cards')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error getting business cards via proxy:', errorData);
+      if (error) {
+        console.error('Error getting business cards:', error);
         return [];
       }
 
-      const data = await response.json();
       return data || [];
     } catch (error) {
       console.error('Connection error getting business cards:', error);

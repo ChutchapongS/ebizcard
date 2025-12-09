@@ -1,5 +1,7 @@
 'use client';
 
+import { getWebSettings } from '@/lib/api-client';
+
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { 
@@ -65,11 +67,7 @@ export const Features = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await fetch('/api/admin/web-settings');
-        if (!response.ok) {
-          throw new Error('Failed to load settings');
-        }
-        const data = await response.json();
+        const data = await getWebSettings();
         
         if (data.success && data.settings) {
           if (data.settings.features_title) {

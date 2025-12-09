@@ -1,5 +1,7 @@
 'use client';
 
+import { getWebSettings } from '@/lib/api-client';
+
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -34,19 +36,18 @@ export default function RegisterPage() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await fetch('/api/admin/web-settings');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.settings?.privacy_policy) {
+        const data = await getWebSettings();
+        if (data.success && data.settings) {
+          if (data.settings.privacy_policy) {
             setPrivacyPolicy(data.settings.privacy_policy);
           }
-          if (data.success && data.settings?.terms_of_service) {
+          if (data.settings.terms_of_service) {
             setTermsOfService(data.settings.terms_of_service);
           }
-          if (data.success && data.settings?.logo_url) {
+          if (data.settings.logo_url) {
             setLogoUrl(data.settings.logo_url);
           }
-          if (data.success && data.settings?.site_name) {
+          if (data.settings.site_name) {
             setSiteName(data.settings.site_name);
           }
         }
@@ -330,17 +331,14 @@ export default function RegisterPage() {
                   type="button"
                   onClick={async () => {
                     try {
-                      const response = await fetch('/api/admin/web-settings');
-                      if (response.ok) {
-                        const data = await response.json();
-                        if (data.success && data.settings?.terms_of_service) {
-                          const termsContent = data.settings.terms_of_service;
-                          setTermsOfService(termsContent);
-                          setModalTermsContent(termsContent);
-                        } else {
-                          setTermsOfService('');
-                          setModalTermsContent('');
-                        }
+                      const data = await getWebSettings();
+                      if (data.success && data.settings?.terms_of_service) {
+                        const termsContent = data.settings.terms_of_service;
+                        setTermsOfService(termsContent);
+                        setModalTermsContent(termsContent);
+                      } else {
+                        setTermsOfService('');
+                        setModalTermsContent('');
                       }
                     } catch (error) {
                       console.warn('Error reloading terms of service:', error);
@@ -356,17 +354,14 @@ export default function RegisterPage() {
                   type="button"
                   onClick={async () => {
                     try {
-                      const response = await fetch('/api/admin/web-settings');
-                      if (response.ok) {
-                        const data = await response.json();
-                        if (data.success && data.settings?.privacy_policy) {
-                          const policyContent = data.settings.privacy_policy;
-                          setPrivacyPolicy(policyContent);
-                          setModalPrivacyContent(policyContent);
-                        } else {
-                          setPrivacyPolicy('');
-                          setModalPrivacyContent('');
-                        }
+                      const data = await getWebSettings();
+                      if (data.success && data.settings?.privacy_policy) {
+                        const policyContent = data.settings.privacy_policy;
+                        setPrivacyPolicy(policyContent);
+                        setModalPrivacyContent(policyContent);
+                      } else {
+                        setPrivacyPolicy('');
+                        setModalPrivacyContent('');
                       }
                     } catch (error) {
                       console.warn('Error reloading privacy policy:', error);

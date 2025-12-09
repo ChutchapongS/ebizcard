@@ -51,17 +51,10 @@ export const CardView = ({ card }: CardViewProps) => {
 
     setIsDownloadingVCard(true);
     try {
-      const response = await fetch('/api/generate-vcard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: card.id }),
-      });
+      // Use Edge Function directly
+      const { generateVCard } = await import('@/lib/api-client');
+      const blob = await generateVCard(card.id);
       
-      if (!response.ok) {
-        throw new Error('Failed to generate vCard');
-      }
-      
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

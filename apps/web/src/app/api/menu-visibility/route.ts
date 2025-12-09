@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Force dynamic rendering since we use headers
+// Force dynamic to avoid static optimization errors during build
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
+
+// Note: API routes are not supported in static export mode
+// When NEXT_STATIC_EXPORT=true, Next.js will automatically skip API routes during build
+// API routes are dynamic by nature and don't need explicit dynamic export
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;

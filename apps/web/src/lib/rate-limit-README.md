@@ -39,9 +39,8 @@ export async function POST(request: NextRequest) {
 - `/api/contact` - Contact form (prevents spam)
 
 ### Standard (30 req/min)
-- `/api/update-profile` - Profile updates
-- `/api/get-profile` - Profile retrieval
 - `/api/generate-qr` - QR code generation
+- _(เดิม)_ `/api/update-profile`, `/api/get-profile` → ย้ายไป Supabase Edge Functions แล้ว (จัดการ rate limit ที่ layer ใหม่)
 
 ### Relaxed (100 req/min)
 - `/api/card-views` - Card view tracking

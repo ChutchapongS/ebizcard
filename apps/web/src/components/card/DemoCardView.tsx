@@ -50,19 +50,12 @@ export const DemoCardView = ({ card }: DemoCardViewProps) => {
     
     try {
       // Try to use real API first
-      const response = await fetch('/api/generate-qr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: card.id }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setQrCodeUrl(data.qrCode);
-          setIsGeneratingQR(false);
-          return;
-        }
+      const { generateQRCode } = await import('@/lib/api-client');
+      const data = await generateQRCode(card.id);
+      if (data.success) {
+        setQrCodeUrl(data.qrCode);
+        setIsGeneratingQR(false);
+        return;
       }
     } catch (error) {
       // API failed, using fallback

@@ -14,6 +14,7 @@ import {
   Crown
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getLevelCapabilities, saveLevelCapabilities } from '@/lib/api-client';
 
 interface LevelCapabilityTabProps {
   userRole: string;
@@ -79,13 +80,7 @@ export default function LevelCapabilityTab({ userRole }: LevelCapabilityTabProps
   const loadLevelCapabilities = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/level-capabilities');
-      
-      if (!response.ok) {
-        throw new Error('Failed to load level capabilities');
-      }
-      
-      const data = await response.json();
+      const data = await getLevelCapabilities();
       
       if (data.success && data.capabilities) {
         setCapabilities(data.capabilities);
@@ -112,23 +107,13 @@ export default function LevelCapabilityTab({ userRole }: LevelCapabilityTabProps
     try {
       setSaving(true);
 
-      const response = await fetch('/api/admin/level-capabilities', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ capabilities }),
-      });
+      const response = await saveLevelCapabilities(capabilities);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save level capabilities');
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to save level capabilities');
       }
-
-      const data = await response.json();
       
-      toast.success('บันทึกการตั้งค่าขีดความสามารถสำเร็จ');
+      toast.success(response.message || 'บันทึกการตั้งค่าขีดความสามารถสำเร็จ');
       
       // Reload settings to ensure sync
       await loadLevelCapabilities();

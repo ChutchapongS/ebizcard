@@ -60,20 +60,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID and addresses array are required' }, { status: 400 });
     }
 
-    // First, delete all existing addresses for this user
-    const { error: deleteError } = await supabase
+    console.log(`[Addresses API] Updating addresses for user: ${userId}, count: ${addresses.length}`);
+    console.log(`[Addresses API] Address types being saved:`, addresses.map((a: any) => a.type));
+
+    // Get existing addresses to compare
+    const { data: existingAddresses, error: fetchError } = await supabase
       .from('addresses')
-      .delete()
+      .select('*')
       .eq('user_id', userId);
 
-    if (deleteError) {
-      console.error('Error deleting existing addresses:', deleteError);
-      return NextResponse.json({ error: 'Failed to delete existing addresses' }, { status: 500 });
+    if (fetchError) {
+      console.error('Error fetching existing addresses:', fetchError);
+      // Continue anyway, might be first time
     }
 
-    // Then insert new addresses
+    console.log(`[Addresses API] Found ${existingAddresses?.length || 0} existing addresses`);
+    if (existingAddresses && existingAddresses.length > 0) {
+      console.log(`[Addresses API] Existing address types:`, existingAddresses.map((a: any) => a.type));
+      console.log(`[Addresses API] Existing address IDs:`, existingAddresses.map((a: any) => a.id));
+    }
+    
+    // Also check if there are addresses with different user_ids (for debugging)
+    const { data: allAddresses, error: allAddressesError } = await supabase
+      .from('addresses')
+      .select('user_id, type, id, created_at')
+      .order('created_at', { ascending: false })
+      .limit(10);
+    
+    if (!allAddressesError && allAddresses) {
+      console.log(`[Addresses API] Recent addresses in database (last 10):`, 
+        allAddresses.map((a: any) => ({ user_id: a.user_id, type: a.type, id: a.id.substring(0, 8) + '...' }))
+      );
+    }
+
+    // Use upsert strategy instead of delete-all-then-insert
+    // This prevents data loss if user ID changes or if there's a race condition
     if (addresses.length > 0) {
-      const addressesToInsert: AddressInsert[] = addresses.map((address: AddressInput) => ({
+      const addressesToUpsert: AddressInsert[] = addresses.map((address: AddressInput) => ({
         user_id: userId,
         type: address.type || 'home',
         place: address.place || null,
@@ -85,20 +108,66 @@ export async function POST(request: NextRequest) {
         country: address.country || 'Thailand'
       }));
 
-      const { data, error: insertError } = await supabase
+      // Upsert addresses (update if exists based on user_id + type, insert if not)
+      // Note: This requires a unique constraint on (user_id, type) in the database
+      // If the constraint doesn't exist, we'll fall back to delete-then-insert
+      const { data, error: upsertError } = await supabase
         .from('addresses')
-        .insert(addressesToInsert)
+        .upsert(addressesToUpsert, {
+          onConflict: 'user_id,type',
+          ignoreDuplicates: false
+        })
         .select();
 
-      if (insertError) {
-        console.error('Error inserting addresses:', insertError);
-        return NextResponse.json({ error: 'Failed to insert addresses' }, { status: 500 });
+      if (upsertError) {
+        console.error('Error upserting addresses:', upsertError);
+        // Fallback to delete-then-insert if upsert fails (for backward compatibility)
+        console.log('Falling back to delete-then-insert strategy');
+        
+        // Delete existing addresses for this user
+        const { error: deleteError } = await supabase
+          .from('addresses')
+          .delete()
+          .eq('user_id', userId);
+
+        if (deleteError) {
+          console.error('Error deleting existing addresses:', deleteError);
+          return NextResponse.json({ error: 'Failed to delete existing addresses' }, { status: 500 });
+        }
+
+        // Insert new addresses
+        const { data: insertData, error: insertError } = await supabase
+          .from('addresses')
+          .insert(addressesToUpsert)
+          .select();
+
+        if (insertError) {
+          console.error('Error inserting addresses:', insertError);
+          return NextResponse.json({ error: 'Failed to insert addresses' }, { status: 500 });
+        }
+
+        console.log(`[Addresses API] Successfully inserted ${insertData?.length || 0} addresses`);
+        return NextResponse.json({ data: insertData, error: null });
       }
 
+      console.log(`[Addresses API] Successfully upserted ${data?.length || 0} addresses`);
       return NextResponse.json({ data, error: null });
-    }
+    } else {
+      // If addresses array is empty, delete all addresses for this user
+      // This allows users to clear all addresses
+      const { error: deleteError } = await supabase
+        .from('addresses')
+        .delete()
+        .eq('user_id', userId);
 
-    return NextResponse.json({ data: [], error: null });
+      if (deleteError) {
+        console.error('Error deleting addresses:', deleteError);
+        return NextResponse.json({ error: 'Failed to delete addresses' }, { status: 500 });
+      }
+
+      console.log(`[Addresses API] Deleted all addresses for user ${userId}`);
+      return NextResponse.json({ data: [], error: null });
+    }
   } catch (error) {
     console.error('Error in POST /api/addresses:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

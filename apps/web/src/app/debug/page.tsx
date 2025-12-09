@@ -144,11 +144,19 @@ export default function DebugPage() {
             <button
               onClick={async () => {
                 try {
-                  const response = await fetch('/api/supabase-proxy?table=business_cards&select=count&limit=1');
-                  if (!response.ok) {
-                    toast.error(`Connection error: ${response.status}`);
+                  if (!supabase) {
+                    toast.error('Supabase client not initialized');
+                    return;
+                  }
+                  // Use Supabase client directly instead of API route
+                  const { count, error } = await supabase
+                    .from('business_cards')
+                    .select('*', { count: 'exact', head: true });
+                  
+                  if (error) {
+                    toast.error(`Connection error: ${error.message}`);
                   } else {
-                    toast.success('Connection successful!');
+                    toast.success(`Connection successful! (${count} cards)`);
                   }
                 } catch (err) {
                   toast.error(`Connection failed: ${err}`);
@@ -166,13 +174,22 @@ export default function DebugPage() {
                     return;
                   }
                   
-                  const response = await fetch(`/api/supabase-proxy?table=business_cards&select=*&user_id=eq.${user.id}&limit=5`);
+                  if (!supabase) {
+                    toast.error('Supabase client not initialized');
+                    return;
+                  }
                   
-                  if (!response.ok) {
-                    toast.error(`Business cards error: ${response.status}`);
+                  // Use Supabase client directly instead of API route
+                  const { data: cards, error } = await supabase
+                    .from('business_cards')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .limit(5);
+                  
+                  if (error) {
+                    toast.error(`Business cards error: ${error.message}`);
                   } else {
-                    const data = await response.json();
-                    toast.success(`พบข้อมูลนามบัตร ${data?.length || 0} รายการ`);
+                    toast.success(`พบข้อมูลนามบัตร ${cards?.length || 0} รายการ`);
                   }
                 } catch (err) {
                   toast.error(`Business cards failed: ${err}`);
@@ -190,6 +207,11 @@ export default function DebugPage() {
                     return;
                   }
                   
+                  if (!supabase) {
+                    toast.error('Supabase client not initialized');
+                    return;
+                  }
+                  
                   const testCard = {
                     name: 'Test Card',
                     job_title: 'Test Job',
@@ -199,25 +221,25 @@ export default function DebugPage() {
                     user_id: user.id
                   };
 
-                  const response = await fetch('/api/supabase-proxy?table=business_cards', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(testCard),
-                  });
+                  // Use Supabase client directly instead of API route
+                  const { data, error } = await (supabase
+                    .from('business_cards') as any)
+                    .insert(testCard)
+                    .select()
+                    .single();
 
-                  if (!response.ok) {
-                    const errorData = await response.json();
-                    toast.error(`Card creation error: ${errorData.error || response.status}`);
+                  if (error) {
+                    toast.error(`Card creation error: ${error.message}`);
                   } else {
-                    const data = await response.json();
                     toast.success(`สร้างนามบัตรสำเร็จ: ${data.id}`);
                     
-                    // Clean up using proxy
-                    await fetch(`/api/supabase-proxy?table=business_cards&id=eq.${data.id}`, {
-                      method: 'DELETE',
-                    });
+                    // Clean up using Supabase client directly
+                    if (supabase) {
+                      await supabase
+                        .from('business_cards')
+                        .delete()
+                        .eq('id', data.id);
+                    }
                   }
                 } catch (err) {
                   toast.error(`Card creation failed: ${err}`);

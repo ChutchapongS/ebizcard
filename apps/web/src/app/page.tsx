@@ -8,6 +8,11 @@ import { SliderShowcase } from '@/components/landing/SliderShowcase';
 import { Features } from '@/components/landing/Features';
 import { Footer } from '@/components/landing/Footer';
 
+// This page uses client-side features that cannot be statically generated
+// Skip static generation for this page when using output: 'export'
+export const dynamic = 'error';
+export const revalidate = 0;
+
 export default function HomePage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();

@@ -1,5 +1,7 @@
 'use client';
 
+import { getWebSettings } from '@/lib/api-client';
+
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
@@ -45,11 +47,7 @@ export const SliderShowcase = () => {
   useEffect(() => {
     const fetchSlides = async () => {
       try {
-        const response = await fetch('/api/admin/web-settings');
-        if (!response.ok) {
-          throw new Error('Failed to load slider data');
-        }
-        const data = await response.json();
+        const data = await getWebSettings();
         
         // Load slider section background
         if (data?.settings?.slider_section_background) {

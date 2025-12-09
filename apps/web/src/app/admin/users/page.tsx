@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth-context';
 import { Navbar } from '@/components/layout/Navbar';
 import { Shield, Users, UserCheck, UserX, AlertCircle, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getUsers, updateUserType } from '@/lib/api-client';
 
 interface User {
   id: string;
@@ -59,19 +60,7 @@ export default function AdminUsersPage() {
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/admin/update-user-type', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch users');
-      }
-
-      const data = await response.json();
+      const data = await getUsers();
       
       setUsers(data.users);
     } catch (error) {
@@ -84,26 +73,12 @@ export default function AdminUsersPage() {
 
   const updateUserRole = async (userId: string, role: string, reason: string) => {
     try {
-      const response = await fetch('/api/admin/update-user-type', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          targetUserId: userId,
-          newRole: role,
-          reason: reason
-        }),
-      });
+      const response = await updateUserType(userId, role, undefined, reason);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update user role');
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to update user role');
       }
-
-      const data = await response.json();
-      toast.success(data.message);
+      toast.success(response.message);
       
       // Refresh users list
       await fetchUsers();

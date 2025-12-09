@@ -28,6 +28,7 @@ import { createUserData, UserData } from '@/utils/userDataUtils';
 import { TemplatePreview } from '@/components/theme-customization/TemplatePreview';
 import { CardView } from '@/components/card/CardView';
 import type { CardView as CardViewLog } from '@/types';
+import { getProfile, generateQRCode } from '@/lib/api-client';
 
 interface User {
   id: string;
@@ -164,26 +165,7 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
       if (!user?.id) return;
       
       try {
-        // Get current session for authentication
-        const { data: { session } } = await supabase!.auth.getSession();
-        const accessToken = session?.access_token;
-        
-        if (!accessToken) {
-          console.error('❌ No access token available');
-          return;
-        }
-        
-        const response = await fetch('/api/get-profile', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            access_token: accessToken
-          })
-        });
-        
-        const data = await response.json();
+        const data = await getProfile();
         
         if (data.success && data.profile) {
           const userData = createUserData(data.profile, user, data.profile.addresses || []);
@@ -685,17 +667,9 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
     
     try {
       // Generate QR Code automatically
-      const response = await fetch('/api/generate-qr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: selectedCard.id }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.qrCode) {
-          setShareQRCode(data.qrCode);
-        }
+      const data = await generateQRCode(selectedCard.id);
+      if (data.success && data.qrCode) {
+        setShareQRCode(data.qrCode);
       }
     } catch (error) {
       console.error('Error generating QR for share:', error);
@@ -880,20 +854,17 @@ export const DashboardContent = ({ user }: DashboardContentProps) => {
     
     try {
       // Generate QR Code automatically
-      const response = await fetch('/api/generate-qr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId: card.id }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success && data.qrCode) {
-          setShareQRCode(data.qrCode);
-        }
+      const data = await generateQRCode(card.id);
+      if (data.success && data.qrCode) {
+        setShareQRCode(data.qrCode);
+      } else {
+        console.error('Failed to generate QR code:', data);
+        toast.error('ไม่สามารถสร้าง QR Code ได้');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error generating QR for share:', error);
+      const errorMessage = error?.message || error?.data?.error || 'ไม่สามารถสร้าง QR Code ได้';
+      toast.error(errorMessage);
     } finally {
       setIsGeneratingShareQR(false);
     }

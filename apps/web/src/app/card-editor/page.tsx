@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/lib/auth-context';
 import { BusinessCard } from '@/types';
-import { businessCards } from '@/lib/supabase/client';
+import { businessCards, supabase } from '@/lib/supabase/client';
+import { getProfile, getLevelCapabilities, getTemplates } from '@/lib/api-client';
 import { ArrowLeft, Save, ChevronDown, Edit, Plus } from 'lucide-react';
 import { Navbar } from '@/components/layout/Navbar';
 import { createUserData, UserData, getUserFieldValue } from '@/utils/userDataUtils';
@@ -173,65 +174,31 @@ export default function CardEditorPage() {
       // Load user role for permission checking
       const loadUserRole = async () => {
         try {
-          // console.log('🔍 Loading user role for card-editor...');
-          
-          // Get session token like Navbar does
-          const { supabase } = await import('@/lib/supabase/client');
-          if (!supabase) return;
-          
-          const { data: { session } } = await supabase.auth.getSession();
-          
-          if (!session?.access_token) {
-            // console.error('🔍 No session token available');
-            return;
-          }
-          
-          const response = await fetch('/api/get-profile', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              access_token: session.access_token
-            }),
-          });
-          
-          if (response.ok) {
-            const result = await response.json();
-            // console.log('🔍 Profile response:', result);
-            if (result.success && result.profile) {
-              const userType = result.profile.user_type || 'user';
-              // console.log('🔍 Setting currentUserRole to:', userType);
-              setCurrentUserRole(userType);
-              
-              // Store image URLs in separate state to prevent reset
-              const avatarUrl = result.profile.avatar_url || user?.user_metadata?.avatar_url || '';
-              const companyLogo = result.profile.company_logo || user?.user_metadata?.company_logo || '';
-              
-              setImageUrls({
+          const result = await getProfile();
+          if (result.success && result.profile) {
+            const userType = result.profile.user_type || 'user';
+            setCurrentUserRole(userType);
+            
+            const avatarUrl = result.profile.avatar_url || user?.user_metadata?.avatar_url || '';
+            const companyLogo = result.profile.company_logo || user?.user_metadata?.company_logo || '';
+            
+            setImageUrls({
+              avatar_url: avatarUrl,
+              company_logo: companyLogo
+            });
+            
+            if (user) {
+              user.user_metadata = {
+                ...user.user_metadata,
                 avatar_url: avatarUrl,
                 company_logo: companyLogo
-              });
+              };
               
-              // Stored image URLs in state
-              
-              // Update user metadata with profile data for image binding
-              if (user) {
-                user.user_metadata = {
-                  ...user.user_metadata,
-                  avatar_url: avatarUrl,
-                  company_logo: companyLogo
-                };
-                
-                // Mark profile as loaded
-                setProfileLoaded(true);
-              }
+              setProfileLoaded(true);
             }
-          } else {
-            // console.error('🔍 Failed to load profile:', response.status, response.statusText);
           }
         } catch (error) {
-          // console.error('Error loading user role:', error);
+          console.error('Error loading user role:', error);
         }
       };
       
@@ -282,13 +249,10 @@ export default function CardEditorPage() {
   useEffect(() => {
     const loadCapabilities = async () => {
       try {
-        const response = await fetch('/api/admin/level-capabilities');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.capabilities) {
-            setPlanCapabilities(data.capabilities);
-            console.log('📊 Plan capabilities loaded:', data.capabilities);
-          }
+        const data = await getLevelCapabilities();
+        if (data.success && data.capabilities) {
+          setPlanCapabilities(data.capabilities);
+          console.log('📊 Plan capabilities loaded:', data.capabilities);
         }
       } catch (error) {
         console.error('Error loading capabilities:', error);
@@ -305,26 +269,7 @@ export default function CardEditorPage() {
         try {
           console.log('🔄 Loading user data for card limits');
           
-          // Get session token for authorization
-          const { supabase } = await import('@/lib/supabase/client');
-          const { data: { session } } = await supabase!.auth.getSession();
-          
-          if (!session?.access_token) {
-            console.warn('No session token');
-            return;
-          }
-          
-          const response = await fetch('/api/get-profile', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              access_token: session.access_token,
-            }),
-          });
-          
-          const result = await response.json();
+          const result = await getProfile();
           console.log('🔄 Profile response:', result);
           
           if (result.success && result.profile) {
@@ -355,15 +300,18 @@ export default function CardEditorPage() {
             setUserPlan(plan);
             console.log('👤 User plan set to:', plan, 'from role:', profile.user_type);
             
-            // Load user's current cards count
-            const cardsResponse = await fetch(`/api/supabase-proxy?table=business_cards&select=id&user_id=${user.id}`);
-            if (cardsResponse.ok) {
-              const cards = await cardsResponse.json();
+            // Load user's current cards count using Supabase client
+            const { data: cards, error: cardsError } = await supabase!
+              .from('business_cards')
+              .select('id')
+              .eq('user_id', user.id);
+            
+            if (cardsError) {
+              console.error('Failed to load cards:', cardsError);
+              setUserCardsCount(0);
+            } else {
               console.log('📋 Cards loaded:', cards?.length || 0);
               setUserCardsCount(cards?.length || 0);
-            } else {
-              console.error('Failed to load cards:', cardsResponse.status);
-              setUserCardsCount(0);
             }
           }
         } catch (error) {
@@ -406,26 +354,16 @@ export default function CardEditorPage() {
       const { supabase } = await import('@/lib/supabase/client');
       if (!supabase) return;
       
-      const { data: { session } } = await supabase.auth.getSession();
+      const data = await getTemplates();
+      const templatesData = data.templates || [];
+      // console.log('🔍 Templates loaded in card-editor:', templatesData.map(t => ({
+      //   id: t.id,
+      //   name: t.name,
+      //   user_type: t.user_type
+      // })));
+      setTemplates(templatesData);
       
-      const headers: HeadersInit = {};
-      if (session?.access_token) {
-        headers['Authorization'] = `Bearer ${session.access_token}`;
-      }
-      
-      const response = await fetch('/api/templates', { headers });
-      if (response.ok) {
-        const data = await response.json();
-        const templatesData = data.templates || [];
-        // console.log('🔍 Templates loaded in card-editor:', templatesData.map(t => ({
-        //   id: t.id,
-        //   name: t.name,
-        //   user_type: t.user_type
-        // })));
-        setTemplates(templatesData);
-        
-        // Don't auto-select here, let useEffect handle it
-      }
+      // Don't auto-select here, let useEffect handle it
     } catch (error) {
       console.error('Error loading templates:', error);
     } finally {
@@ -1485,9 +1423,19 @@ export default function CardEditorPage() {
                                   
                                   return imageUrl ? (
                                     <img 
-                                      src={imageUrl.startsWith('data:') ? imageUrl : 
-                                           imageUrl.startsWith('http') ? imageUrl :
-                                           `/api/supabase-proxy?table=storage&file=${encodeURIComponent(imageUrl)}`}
+                                      src={(() => {
+                                        if (imageUrl.startsWith('data:') || imageUrl.startsWith('http')) {
+                                          return imageUrl;
+                                        }
+                                        // If it's a storage path, get public URL from Supabase
+                                        if (imageUrl.includes('/')) {
+                                          const { data: urlData } = supabase!.storage
+                                            .from('business-cards')
+                                            .getPublicUrl(imageUrl);
+                                          return urlData.publicUrl;
+                                        }
+                                        return imageUrl;
+                                      })()}
                                       alt="Picture" 
                                       className="w-6 h-6 object-contain rounded bg-white border border-gray-200"
                                       onError={(e) => {
@@ -1589,8 +1537,12 @@ export default function CardEditorPage() {
                                     }
                                     
                                     console.log(`🔍 Final content for ${field.id}:`, content);
-                                  } else {
+                                  } else if (field.field) {
+                                    // Has field binding - use fieldValue
                                     content = fieldValue || '';
+                                  } else {
+                                    // No field binding - use originalValue (custom content)
+                                    content = originalValue || '';
                                   }
                                   
                                   // Calculate height based on content
@@ -1611,7 +1563,7 @@ export default function CardEditorPage() {
                                 })()
                               ) : (
                                 <div className="w-full overflow-x-auto whitespace-nowrap scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                                  {fieldValue || '-'}
+                                  {field.field ? (fieldValue || '-') : (originalValue || '-')}
                                 </div>
                               )}
                             </div>
@@ -1948,7 +1900,16 @@ export default function CardEditorPage() {
                                       <img 
                                         src={imageUrl.startsWith('data:') ? imageUrl : 
                                              imageUrl.startsWith('http') ? imageUrl :
-                                             `/api/supabase-proxy?table=storage&file=${encodeURIComponent(imageUrl)}`}
+                                             (() => {
+                                               // If it's a storage path, get public URL from Supabase
+                                               if (imageUrl.includes('/')) {
+                                                 const { data: urlData } = supabase!.storage
+                                                   .from('business-cards')
+                                                   .getPublicUrl(imageUrl);
+                                                 return urlData.publicUrl;
+                                               }
+                                               return imageUrl;
+                                             })()}
                                         alt="Picture" 
                                         className="w-8 h-8 object-contain rounded bg-white border border-gray-200"
                                         onError={(e) => {

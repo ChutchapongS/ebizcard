@@ -13,6 +13,7 @@ import {
   Shield
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getMenuVisibility, saveMenuVisibility } from '@/lib/api-client';
 
 interface MenuVisibilityTabProps {
   userRole: string;
@@ -61,13 +62,7 @@ export default function MenuVisibilityTab({ userRole }: MenuVisibilityTabProps) 
   const loadMenuVisibility = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/menu-visibility');
-      
-      if (!response.ok) {
-        throw new Error('Failed to load menu visibility settings');
-      }
-      
-      const data = await response.json();
+      const data = await getMenuVisibility();
       
       if (data.success && data.settings) {
         setMenuVisibility(data.settings);
@@ -94,23 +89,13 @@ export default function MenuVisibilityTab({ userRole }: MenuVisibilityTabProps) 
     try {
       setSaving(true);
 
-      const response = await fetch('/api/admin/menu-visibility', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ settings: menuVisibility }),
-      });
+      const response = await saveMenuVisibility(menuVisibility);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save menu visibility settings');
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to save menu visibility settings');
       }
-
-      const data = await response.json();
       
-      toast.success('บันทึกการตั้งค่าการมองเห็นเมนูสำเร็จ');
+      toast.success(response.message || 'บันทึกการตั้งค่าการมองเห็นเมนูสำเร็จ');
       
       // Notify other components that menu visibility has been updated
       window.dispatchEvent(new CustomEvent('menuVisibilityUpdated'));

@@ -1,5 +1,7 @@
 'use client';
 
+import { getWebSettings } from '@/lib/api-client';
+
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -33,13 +35,12 @@ export default function LoginPage() {
   useEffect(() => {
     const loadSettings = async () => {
       try {
-        const response = await fetch('/api/admin/web-settings');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.settings?.logo_url) {
+        const data = await getWebSettings();
+        if (data.success && data.settings) {
+          if (data.settings.logo_url) {
             setLogoUrl(data.settings.logo_url);
           }
-          if (data.success && data.settings?.site_name) {
+          if (data.settings.site_name) {
             setSiteName(data.settings.site_name);
           }
         }

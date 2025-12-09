@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 // Force dynamic rendering since we query database
-export const dynamic = 'force-dynamic';
+// Note: API routes are not supported in static export mode
+// When NEXT_STATIC_EXPORT=true, Next.js will skip API routes during build
+// We use 'auto' instead of 'force-dynamic' for static export compatibility
+export const dynamic: 'force-dynamic' | 'auto' = (process.env.NEXT_STATIC_EXPORT === 'true' ? 'auto' : 'force-dynamic') as 'force-dynamic' | 'auto';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;

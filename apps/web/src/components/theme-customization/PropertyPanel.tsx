@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { CanvasElement as Element } from '../../types/theme-customization';
 import QRCodeStyling from 'qr-code-styling';
+import { isAddressInEnglish } from '@/utils/address-translation';
 import { 
   FaPalette, FaStar, FaHeart, FaThumbsUp, FaFire, FaLightbulb,
   FaRocket, FaGem, FaBullseye, FaDumbbell, FaGift,
@@ -179,6 +180,22 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
     iconNameRef.current = element.iconName || '';
   }, [element]);
 
+  // Auto-disable and uncheck prefix checkbox for English addresses
+  useEffect(() => {
+    if (localElement.type === 'textarea' && localElement.field && userData?.addresses) {
+      const addressFields = ['personalAddress1', 'personalAddress2', 'workAddress1', 'workAddress2'];
+      if (addressFields.includes(localElement.field)) {
+        const isEnglish = isAddressFieldInEnglish(localElement.field);
+        if (isEnglish && localElement.useAddressPrefix !== false) {
+          const updatedElement = { ...localElement, useAddressPrefix: false };
+          setLocalElement(updatedElement);
+          onElementChange(updatedElement);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localElement.field, localElement.type, userData?.addresses]);
+
   const handleContentChange = (content: string) => {
     const updatedElement = { ...localElement, content };
     setLocalElement(updatedElement);
@@ -235,6 +252,33 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
     };
     setLocalElement(updatedElement);
     onElementChange(updatedElement);
+  };
+
+  // Check if address field is in English
+  const isAddressFieldInEnglish = (field: string): boolean => {
+    if (!userData || !userData.addresses) return false;
+    
+    let address: any = null;
+    
+    // Find address based on field
+    if (field === 'personalAddress1') {
+      address = userData.addresses.find((addr: any) => addr.type === 'personal_1');
+    } else if (field === 'personalAddress2') {
+      address = userData.addresses.find((addr: any) => addr.type === 'personal_2');
+    } else if (field === 'workAddress1') {
+      address = userData.addresses.find((addr: any) => addr.type === 'work_1');
+    } else if (field === 'workAddress2') {
+      address = userData.addresses.find((addr: any) => addr.type === 'work_2');
+    }
+    
+    if (!address) return false;
+    
+    // Use isAddressInEnglish to check if address is in English
+    return isAddressInEnglish({
+      province: address.province || '',
+      district: address.district || '',
+      tambon: address.tambon || address.subdistrict || ''
+    });
   };
 
   // Get data from userData based on field
@@ -304,6 +348,7 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
       'personalPhone': userData.personalPhone || userData.user_metadata?.personal_phone || '',
       'personalEmail': userData.personalEmail || userData.user_metadata?.personal_email || '',
       'workName': userData.workName || userData.user_metadata?.company || '',
+      'workNameTh': userData.workNameTh || userData.user_metadata?.company_th || '',
       'workDepartment': userData.workDepartment || userData.user_metadata?.department || '',
       'workPosition': userData.workPosition || userData.user_metadata?.job_title || '',
       'workPhone': userData.workPhone || userData.user_metadata?.work_phone || '',
@@ -567,6 +612,9 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
       'zoom': userData.zoom || userData.user_metadata?.zoom || '',
       'github': userData.github || userData.user_metadata?.github || '',
       'twitch': userData.twitch || userData.user_metadata?.twitch || '',
+      // Image fields
+      'profileImage': userData.profileImage || userData.user_metadata?.avatar_url || userData.user_metadata?.profile_image || '',
+      'companyLogo': userData.companyLogo || userData.user_metadata?.company_logo || '',
     };
 
     const result = fieldMap[field] || '';
@@ -660,13 +708,13 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                       <option value="personalPhone">เบอร์โทรศัพท์ส่วนตัว</option>
                       <option value="personalEmail">อีเมลส่วนตัว</option>
                       <option value="workName">ชื่อบริษัท</option>
+                      <option value="workNameTh">ชื่อบริษัท (ไทย)</option>
                     <option value="workDepartment">แผนก/ส่วนงาน</option>
                       <option value="workPosition">ตำแหน่งงาน</option>
                       <option value="workPhone">เบอร์โทรศัพท์ที่ทำงาน</option>
                       <option value="workEmail">อีเมลที่ทำงาน</option>
                       <option value="workWebsite">เว็บไซต์</option>
-                    <option value="taxIdMain">เลขประจำตัวผู้เสียภาษี (สำนักงานใหญ่)</option>
-                    <option value="taxIdBranch">เลขประจำตัวผู้เสียภาษี (สาขาย่อย)</option>
+                    <option value="taxIdMain">เลขประจำตัวผู้เสียภาษี</option>
                   </>
                 )}
                 
@@ -721,9 +769,14 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
                                 setLocalElement(updatedElement);
                                 onElementChange(updatedElement);
                               }}
-                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                              disabled={isAddressFieldInEnglish(localElement.field)}
+                              className={`w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 ${
+                                isAddressFieldInEnglish(localElement.field) ? 'opacity-50 cursor-not-allowed' : ''
+                              }`}
                             />
-                            <span className="text-xs text-gray-600">Use prefix (แขวง/เขต, ตำบล/อำเภอ, จังหวัด)</span>
+                            <span className={`text-xs ${isAddressFieldInEnglish(localElement.field) ? 'text-gray-400' : 'text-gray-600'}`}>
+                              Use prefix (แขวง/เขต, ตำบล/อำเภอ, จังหวัด)
+                            </span>
                       </div>
                         </div>
                       )}
@@ -903,86 +956,116 @@ const PropertyPanel: React.FC<PropertyPanelProps> = ({
           <div className="space-y-4">
             <h4 className="text-sm font-medium text-gray-700">Picture</h4>
             
-            {/* Image Upload */}
+            {/* Bind to Field */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Bind to Field</label>
+              <select
+                value={localElement.field || ''}
+                onChange={(e) => handleFieldChange(e.target.value)}
+                className="w-full h-8 px-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+              >
+                <option value="">Custom Image</option>
+                <option value="profileImage">รูป Profile</option>
+                <option value="companyLogo">รูป Logo บริษัท</option>
+              </select>
+            </div>
+
+            {/* Field Data Display */}
+            {localElement.field && (
               <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Upload Image</label>
-                    <input
-                      ref={imageUploadRef}
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          const reader = new FileReader();
-                          reader.onload = (event) => {
-                            const imageUrl = event.target?.result as string;
-                      const updatedElement = { ...localElement, imageUrl };
-                            setLocalElement(updatedElement);
-                            onElementChange(updatedElement);
-                          };
-                          reader.readAsDataURL(file);
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Field Data
+                </label>
+                <div className="w-full px-3 h-10 border border-gray-300 rounded-md bg-gray-50 text-gray-700 text-xs flex items-center">
+                  {getFieldData(localElement.field) || 'No data available'}
+                </div>
+              </div>
+            )}
+
+            {/* Image Upload - Only show if not bound to field */}
+            {!localElement.field && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Upload Image</label>
+                <input
+                  ref={imageUploadRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      const reader = new FileReader();
+                      reader.onload = (event) => {
+                        const imageUrl = event.target?.result as string;
+                        const updatedElement = { ...localElement, imageUrl };
+                        setLocalElement(updatedElement);
+                        onElementChange(updatedElement);
+                      };
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  className="w-full h-10 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                />
+              </div>
+            )}
+
+            {/* Image URL - Only show if not bound to field */}
+            {!localElement.field && (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Image URL</label>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    value={localElement.imageUrl || ''}
+                    onChange={(e) => {
+                      const updatedElement = { ...localElement, imageUrl: e.target.value };
+                      setLocalElement(updatedElement);
+                      onElementChange(updatedElement);
+                    }}
+                    className="flex-1 h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                    placeholder="Enter image URL"
+                  />
+                  {localElement.imageUrl && (
+                    <button
+                      onClick={() => {
+                        const updatedElement = { ...localElement, imageUrl: '' };
+                        setLocalElement(updatedElement);
+                        onElementChange(updatedElement);
+                        // Reset file input
+                        if (imageUploadRef.current) {
+                          imageUploadRef.current.value = '';
                         }
                       }}
-                      className="w-full h-10 px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
-                    />
-                  </div>
-
-            {/* Image URL */}
-              <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Image URL</label>
-              <div className="flex space-x-2">
-                    <input
-                type="text"
-                value={localElement.imageUrl || ''}
-                      onChange={(e) => {
-                  const updatedElement = { ...localElement, imageUrl: e.target.value };
-                            setLocalElement(updatedElement);
-                            onElementChange(updatedElement);
-                      }}
-                      className="flex-1 h-10 px-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
-                placeholder="Enter image URL"
-                    />
-                    {localElement.imageUrl && (
-                      <button
-                        onClick={() => {
-                          const updatedElement = { ...localElement, imageUrl: '' };
-                          setLocalElement(updatedElement);
-                          onElementChange(updatedElement);
-                          // Reset file input
-                          if (imageUploadRef.current) {
-                            imageUploadRef.current.value = '';
-                          }
-                        }}
-                        className="px-3 py-2 bg-red-500 text-white text-xs rounded-md hover:bg-red-600 transition-colors"
-                        title="ลบรูปภาพ"
-                      >
-                        ลบ
-                      </button>
-                    )}
-                  </div>
-                  </div>
-                
-                {/* Image Preview */}
-                {(localElement.imageUrl || getFieldData(localElement.field || '')) && (
-                  <div className="mt-2 relative w-full h-32">
-                    <Image 
-                      src={
-                        (localElement.field && getFieldData(localElement.field)) 
-                          ? getFieldData(localElement.field) || ''
-                          : localElement.imageUrl || ''
-                      } 
-                      alt="Preview" 
-                      fill
-                      className="object-cover rounded-md border border-gray-300"
-                      sizes="100vw"
-                      unoptimized
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  </div>
-                )}
+                      className="px-3 py-2 bg-red-500 text-white text-xs rounded-md hover:bg-red-600 transition-colors"
+                      title="ลบรูปภาพ"
+                    >
+                      ลบ
+                    </button>
+                  )}
+                </div>
               </div>
+            )}
+                
+            {/* Image Preview */}
+            {(localElement.imageUrl || (localElement.field && getFieldData(localElement.field))) && (
+              <div className="mt-2 relative w-full h-32">
+                <Image 
+                  src={
+                    (localElement.field && getFieldData(localElement.field)) 
+                      ? getFieldData(localElement.field) || ''
+                      : localElement.imageUrl || ''
+                  } 
+                  alt="Preview" 
+                  fill
+                  className="object-cover rounded-md border border-gray-300"
+                  sizes="100vw"
+                  unoptimized
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+          </div>
           )}
 
         {/* Icon Properties */}

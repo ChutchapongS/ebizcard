@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { Shield, Users, UserCheck, UserX, AlertCircle, Clock, Ban, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { updateUserType, getUsers } from '@/lib/api-client';
 
 interface UserManagementTabProps {
   userRole: string;
@@ -63,20 +64,7 @@ export default function UserManagementTab({ userRole }: UserManagementTabProps) 
       setLoading(true);
       setError(null);
       
-      const response = await fetch('/api/admin/update-user-type', {
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('❌ API Error:', errorData);
-        throw new Error(errorData.error || 'Failed to fetch users');
-      }
-
-      const data = await response.json();
+      const data = await getUsers();
       
       setUsers(data.users);
     } catch (error) {
@@ -101,21 +89,13 @@ export default function UserManagementTab({ userRole }: UserManagementTabProps) 
         requestBody.newPlan = plan;
       }
 
-      const response = await fetch('/api/admin/update-user-type', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${session?.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update user role');
-      }
-
-      const data = await response.json();
+      const data = await updateUserType(
+        requestBody.targetUserId,
+        requestBody.newRole,
+        requestBody.newPlan,
+        requestBody.reason
+      );
+      
       toast.success(data.message || 'อัปเดตสิทธิ์ผู้ใช้สำเร็จ');
       
       // Refresh users list

@@ -64,26 +64,16 @@ export const QRCodeGenerator = ({ cardId, cardName, className = '' }: QRCodeGene
     setIsGenerating(true);
     setError(null);
     try {
-      const response = await fetch('/api/generate-qr', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cardId }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('QR API error:', errorData);
-        throw new Error(errorData.error || 'Failed to generate QR code');
-      }
-
-      const data = await response.json();
+      // Use Edge Function
+      const { generateQRCode } = await import('@/lib/api-client');
+      const data = await generateQRCode(cardId);
       
       if (data.success) {
         setQrCodeUrl(data.qrCode);
         setPublicUrl(data.publicUrl);
         toast.success('สร้าง QR Code สำเร็จ');
       } else {
-        throw new Error(data.error || 'Failed to generate QR code');
+        throw new Error('Failed to generate QR code');
       }
     } catch (error) {
       console.error('Error generating QR code:', error);

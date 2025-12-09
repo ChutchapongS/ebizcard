@@ -9,8 +9,9 @@ import { Template, CanvasElement, PaperSettings, MOCK_DATA } from '@/types/theme
 import { SAMPLE_TEMPLATES } from '@/data/sample-templates';
 import { useAuth } from '@/lib/auth-context';
 import { createUserData, UserData } from '@/utils/userDataUtils';
-import { Edit, Trash2, Eye, Copy, Plus, Save } from 'lucide-react';
+import { Edit, Trash2, Eye, Copy, Plus, Save, Pencil } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { getProfile, getLevelCapabilities, getTemplates, getTemplateUsage, createTemplate, deleteTemplate } from '@/lib/api-client';
 
 const Canvas = dynamic(
   () =>
@@ -126,6 +127,11 @@ export default function ThemeCustomizationPage() {
   // Delete template confirmation modal
   const [showDeleteModal, setShowDeleteModal] = useState<boolean>(false);
   const [templateToDelete, setTemplateToDelete] = useState<{ id: string; name: string; cards: any[] } | null>(null);
+  
+  // Rename template modal
+  const [showRenameModal, setShowRenameModal] = useState<boolean>(false);
+  const [templateToRename, setTemplateToRename] = useState<{ id: string; name: string; user_type?: string } | null>(null);
+  const [renameTemplateName, setRenameTemplateName] = useState<string>('');
 
   // Helper: reset Create/Edit tab to initial state
   const resetCreateTabState = useCallback(() => {
@@ -171,39 +177,10 @@ export default function ThemeCustomizationPage() {
           lastFetchTimeRef.current = now; // Update last fetch time
           
           // ใช้ API เดียวกันกับหน้า Settings
-          console.log('🔄 Fetching profile data via /api/get-profile');
+          console.log('🔄 Fetching profile data via Edge Function');
           
-          const { supabase } = await import('@/lib/supabase/client');
-          const { data: { session } } = await supabase!.auth.getSession();
-          
-          if (!session?.access_token) {
-            console.warn('No session token');
-            setIsLoadingUserData(false);
-            return;
-          }
-          
-          const response = await fetch('/api/get-profile', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              access_token: session.access_token,
-            }),
-          });
-          
-          const result = await response.json();
+          const result = await getProfile();
           console.log('🔄 Profile response:', result);
-          
-          // Handle rate limit error
-          if (response.status === 429) {
-            console.warn('⚠️ Rate limit exceeded, will retry after cooldown');
-            // Extend cooldown period when rate limited
-            const retryAfter = result.retryAfter || 30;
-            lastFetchTimeRef.current = now - (fetchCooldown - retryAfter * 1000);
-            return;
-          }
-          
           if (result.success && result.profile) {
             const profile = result.profile;
               console.log('Profile data from Supabase:', profile);
@@ -266,7 +243,14 @@ export default function ThemeCustomizationPage() {
           
           console.warn('⚠️ No profile data found');
         } catch (error) {
-          console.error('Error loading profile data:', error);
+          const status = (error as { status?: number })?.status;
+          if (status === 429) {
+            console.warn('⚠️ Rate limit exceeded, will retry after cooldown');
+            const retryAfter = (error as { data?: { retryAfter?: number } })?.data?.retryAfter || 30;
+            lastFetchTimeRef.current = now - (fetchCooldown - retryAfter * 1000);
+          } else {
+            console.error('Error loading profile data:', error);
+          }
         } finally {
           setIsLoadingUserData(false);
         }
@@ -284,12 +268,9 @@ export default function ThemeCustomizationPage() {
   useEffect(() => {
     const loadCapabilities = async () => {
       try {
-        const response = await fetch('/api/admin/level-capabilities');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.capabilities) {
-            setPlanCapabilities(data.capabilities);
-          }
+        const data = await getLevelCapabilities();
+        if (data.success && data.capabilities) {
+          setPlanCapabilities(data.capabilities);
         }
       } catch (error) {
         console.error('Error loading capabilities:', error);
@@ -306,54 +287,34 @@ export default function ThemeCustomizationPage() {
         setLoadingTemplates(true);
         setTemplatesError(null);
         
-        // Get session token for authorization
-        const { supabase } = await import('@/lib/supabase/client');
-        const { data: { session } } = await supabase!.auth.getSession();
-        
-        const headers: HeadersInit = {};
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
-        
         // Load templates
-        const response = await fetch('/api/templates', { headers });
-        if (response.ok) {
-          const data = await response.json();
-          console.log('Raw templates data:', data);
-          
-          // Convert database format to Template format
-          const templates = (data.templates || []).map((dbTemplate: any) => ({
-              id: dbTemplate.id,
-              name: dbTemplate.name,
-            paper: dbTemplate.paper_settings,
-              elements: dbTemplate.elements || [],
-              createdAt: new Date(dbTemplate.created_at),
-              updatedAt: new Date(dbTemplate.updated_at || dbTemplate.created_at),
-            previewImage: dbTemplate.preview_url || '',
-            user_type: dbTemplate.user_type || 'user' // Add user_type for permission checking
-          }));
-          
-          console.log('Converted templates:', templates);
-          setTemplates(templates);
-          
-          // Count user's own templates (exclude admin/owner templates)
-          const userOwnTemplates = templates.filter((t: any) => t.user_type === 'user');
-          setUserTemplatesCount(userOwnTemplates.length);
-        } else {
-          console.error('Failed to fetch templates:', response.status, response.statusText);
-          const errorData = await response.json();
-          console.error('Error details:', errorData);
-          setTemplatesError(`ไม่สามารถโหลด templates ได้: ${errorData.error || response.statusText}`);
-        }
+        const data = await getTemplates();
+        console.log('Raw templates data:', data);
+        
+        // Convert database format to Template format
+        const templates = (data.templates || []).map((dbTemplate: any) => ({
+            id: dbTemplate.id,
+            name: dbTemplate.name,
+          paper: dbTemplate.paper_settings,
+            elements: dbTemplate.elements || [],
+            createdAt: new Date(dbTemplate.created_at),
+            updatedAt: new Date(dbTemplate.updated_at || dbTemplate.created_at),
+          previewImage: dbTemplate.preview_url || '',
+          user_type: dbTemplate.user_type || 'user' // Add user_type for permission checking
+        }));
+        
+        console.log('Converted templates:', templates);
+        setTemplates(templates);
+        
+        // Count user's own templates (exclude admin/owner templates)
+        const userOwnTemplates = templates.filter((t: any) => t.user_type === 'user');
+        setUserTemplatesCount(userOwnTemplates.length);
         
         // Load template usage statistics
         try {
-          const usageResponse = await fetch('/api/templates/usage', { headers });
-          if (usageResponse.ok) {
-            const usageData = await usageResponse.json();
-            console.log('Template usage data:', usageData);
-            setTemplateUsage(usageData.usage || {});
-          }
+          const usageData = await getTemplateUsage();
+          console.log('Template usage data:', usageData);
+          setTemplateUsage(usageData.usage || {});
         } catch (error) {
           console.error('Error loading template usage:', error);
           // Not critical, so just log the error
@@ -386,8 +347,15 @@ export default function ThemeCustomizationPage() {
   }, []);
 
   // When user switches back to Create tab, apply reset once if requested
+  // But don't reset if we're editing a template (editingTemplateId is set)
   useEffect(() => {
     if (activeTab === 'create') {
+      // Don't reset if we're editing a template
+      if (editingTemplateId) {
+        console.log('⏭️ Skipping reset - editing template:', editingTemplateId);
+        return;
+      }
+      
       const resetFlag = sessionStorage.getItem('resetCreateTab');
       if (resetCreateOnOpen || resetFlag === '1') {
         resetCreateTabState();
@@ -395,7 +363,7 @@ export default function ThemeCustomizationPage() {
         try { sessionStorage.removeItem('resetCreateTab'); } catch {}
       }
     }
-  }, [activeTab, resetCreateOnOpen, resetCreateTabState]);
+  }, [activeTab, resetCreateOnOpen, resetCreateTabState, editingTemplateId]);
 
   // Ensure clearing on unmount (client-side navigation away)
   useEffect(() => {
@@ -438,35 +406,54 @@ export default function ThemeCustomizationPage() {
   // Check for editTemplateId from URL parameters
   useEffect(() => {
     const editTemplateId = searchParams.get('editTemplateId');
-    if (editTemplateId && templates.length > 0) {
-      const template = templates.find(t => t.id === editTemplateId);
-      if (template) {
-        console.log('🎨 ThemeCustomization: Auto-loading template for editing:', template.name);
-        // Load template for editing
-        setElements(template.elements || []);
-        setPaperSettings(template.paper || {
-          size: 'Business Card (L)',
-          width: 180,
-          height: 110,
-          orientation: 'portrait',
-          background: {
-            type: 'color',
-            color: '#ffffff',
-            gradient: {
-              type: 'base',
-              colors: ['#ffffff'],
-              direction: 'horizontal'
+    if (editTemplateId) {
+      // Wait for templates to load if they're still loading
+      if (loadingTemplates) {
+        console.log('⏳ Waiting for templates to load before editing...');
+        return;
+      }
+      
+      // If templates are loaded, find and load the template
+      if (templates.length > 0) {
+        const template = templates.find(t => t.id === editTemplateId);
+        if (template) {
+          console.log('🎨 ThemeCustomization: Auto-loading template for editing:', template.name);
+          // Load template for editing
+          setElements(template.elements || []);
+          setPaperSettings(template.paper || {
+            size: 'Business Card (L)',
+            width: 180,
+            height: 110,
+            orientation: 'portrait',
+            background: {
+              type: 'color',
+              color: '#ffffff',
+              gradient: {
+                type: 'base',
+                colors: ['#ffffff'],
+                direction: 'horizontal'
+              }
             }
-          }
-        });
-        setEditingTemplateId(template.id);
-        setEditingTemplateName(template.name);
-        setHasUnsavedChanges(false);
-        setUseAddressPrefix(true); // Reset address prefix to default
-        setActiveTab('create');
+          });
+          setEditingTemplateId(template.id);
+          setEditingTemplateName(template.name);
+          setHasUnsavedChanges(false);
+          setUseAddressPrefix(true); // Reset address prefix to default
+          setActiveTab('create');
+          
+          // Clear the URL parameter to prevent re-triggering on re-render
+          const newSearchParams = new URLSearchParams(searchParams.toString());
+          newSearchParams.delete('editTemplateId');
+          const newUrl = `${window.location.pathname}${newSearchParams.toString() ? '?' + newSearchParams.toString() : ''}`;
+          window.history.replaceState({}, '', newUrl);
+        } else {
+          console.warn('⚠️ Template not found for editing:', editTemplateId);
+        }
+      } else {
+        console.warn('⚠️ Templates list is empty, cannot load template for editing');
       }
     }
-  }, [templates, searchParams]);
+  }, [templates, searchParams, loadingTemplates]);
 
   // Load user data when user changes
   useEffect(() => {
@@ -1018,6 +1005,83 @@ export default function ThemeCustomizationPage() {
     });
   };
 
+  // Handle rename template
+  const handleRenameTemplate = async () => {
+    if (!templateToRename || !renameTemplateName.trim()) {
+      toast.error('กรุณากรอกชื่อแบบนามบัตร');
+      return;
+    }
+
+    // Check permission: only owner and admin can rename templates
+    if (currentUserRole !== 'owner' && currentUserRole !== 'admin') {
+      toast.error('คุณไม่มีสิทธิ์ในการเปลี่ยนชื่อแบบนามบัตร');
+      return;
+    }
+
+    // Check if template is created by owner/admin
+    const template = templates.find(t => t.id === templateToRename.id);
+    if (!template) {
+      toast.error('ไม่พบแบบนามบัตร');
+      return;
+    }
+
+    const templateUserType = (template as any).user_type;
+    if (templateUserType !== 'owner' && templateUserType !== 'admin') {
+      toast.error('สามารถเปลี่ยนชื่อได้เฉพาะแบบนามบัตรที่สร้างโดย Owner/Admin เท่านั้น');
+      return;
+    }
+
+    try {
+      const { updateTemplate } = await import('@/lib/api-client');
+      
+      // Get current template data
+      const currentTemplate = templates.find(t => t.id === templateToRename.id);
+      if (!currentTemplate) {
+        toast.error('ไม่พบแบบนามบัตร');
+        return;
+      }
+
+      // Update only the name
+      // Get preview image from template (could be previewImage or preview_url)
+      const previewImage = currentTemplate.previewImage || (currentTemplate as any).preview_url || '';
+      
+      await updateTemplate(templateToRename.id, {
+        name: renameTemplateName.trim(),
+        paper: currentTemplate.paper,
+        elements: currentTemplate.elements,
+        preview_image: previewImage
+      });
+
+      // Update local state
+      setTemplates(prevTemplates => 
+        prevTemplates.map(t => 
+          t.id === templateToRename.id 
+            ? { ...t, name: renameTemplateName.trim() }
+            : t
+        )
+      );
+
+      toast.success('เปลี่ยนชื่อแบบนามบัตรสำเร็จ');
+      setShowRenameModal(false);
+      setTemplateToRename(null);
+      setRenameTemplateName('');
+    } catch (error: any) {
+      console.error('Error renaming template:', {
+        error,
+        message: error.message,
+        status: error.status,
+        data: error.data,
+        fullError: error
+      });
+      const errorMessage = error.data?.details || error.data?.error || error.data?.fullError || error.message || 'Unknown error';
+      const errorHint = error.data?.hint ? `\n${error.data.hint}` : '';
+      const errorCode = error.data?.code ? `\nError Code: ${error.data.code}` : '';
+      toast.error(`เกิดข้อผิดพลาดในการเปลี่ยนชื่อแบบนามบัตร: ${errorMessage}${errorHint}${errorCode}`, {
+        duration: 5000
+      });
+    }
+  };
+
   const handleSaveTemplate = async () => {
     try {
       setIsSaving(true);
@@ -1094,24 +1158,29 @@ export default function ThemeCustomizationPage() {
       console.log('Template saved successfully:', result);
 
       if (isEditing) {
+        // Store editingTemplateId before clearing it
+        const savedEditingTemplateId = editingTemplateId;
+        
         // Update existing template in local state
         setTemplates(prev => prev.map(template => 
-          template.id === editingTemplateId 
+          template.id === savedEditingTemplateId 
             ? { ...template, name: templateName, paper: paperSettings, elements: elements, updatedAt: new Date(), previewImage: previewImage }
             : template
         ));
         
-        // Clear unsaved changes flag but keep editing state
+        // Clear editing state since we're done editing
+        setEditingTemplateId(null);
+        setEditingTemplateName('');
         setHasUnsavedChanges(false);
         setIsSaving(false);
         
         toast.success('Template อัปเดตสำเร็จ!');
         // Store highlight for one-time badge and show immediately
         try {
-          sessionStorage.setItem('templateHighlight', JSON.stringify({ id: editingTemplateId, type: 'update' }));
+          sessionStorage.setItem('templateHighlight', JSON.stringify({ id: savedEditingTemplateId, type: 'update' }));
         } catch (e) { /* noop */ }
-        if (editingTemplateId) {
-          setHighlightInfo({ id: editingTemplateId, type: 'update' });
+        if (savedEditingTemplateId) {
+          setHighlightInfo({ id: savedEditingTemplateId, type: 'update' });
         }
         // Request resetting the create tab on next open
         setResetCreateOnOpen(true);
@@ -1119,7 +1188,7 @@ export default function ThemeCustomizationPage() {
         // Switch to templates tab and focus on the updated template
         setActiveTab('templates');
         setTimeout(() => {
-          const cardEl = document.querySelector(`[data-template-id="${editingTemplateId}"]`);
+          const cardEl = document.querySelector(`[data-template-id="${savedEditingTemplateId}"]`);
           if (cardEl && 'scrollIntoView' in cardEl) {
             (cardEl as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
@@ -1236,47 +1305,7 @@ export default function ThemeCustomizationPage() {
 
   const performDeleteTemplate = async (templateId: string) => {
     try {
-      const response = await fetch(`/api/templates/${templateId}`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error deleting template:', errorData);
-        
-        // Check if it's a conflict error (template in use)
-        if (response.status === 409 && errorData.details) {
-          const cardsCount = errorData.details.cardsCount || 0;
-          const cards = errorData.details.cards || [];
-          
-          // Show detailed error message with cards using this template
-          let message = `${errorData.error}\n\nมีนามบัตร ${cardsCount} ใบที่กำลังใช้แม่แบบนี้อยู่:\n\n`;
-          cards.slice(0, 5).forEach((card: any, index: number) => {
-            message += `${index + 1}. ${card.name}\n`;
-          });
-          if (cardsCount > 5) {
-            message += `... และอีก ${cardsCount - 5} ใบ\n`;
-          }
-          message += '\n💡 วิธีลบแม่แบบนี้:\n';
-          message += '1. ไปที่หน้า Dashboard\n';
-          message += '2. เลือกนามบัตรที่ต้องการ\n';
-          message += '3. แก้ไขและเปลี่ยนไปใช้แม่แบบอื่น หรือลบนามบัตร\n';
-          message += '4. กลับมาลบแม่แบบนี้อีกครั้ง';
-          
-          // Use confirm instead of alert for better formatting
-          const showDetails = window.confirm(message + '\n\nต้องการไปที่หน้า Dashboard เพื่อจัดการนามบัตรเหล่านี้หรือไม่?');
-          
-          if (showDetails) {
-            window.location.href = '/dashboard';
-          }
-        } else {
-          toast.error('เกิดข้อผิดพลาดในการลบ Template: ' + errorData.error);
-        }
-        return;
-      }
+      await deleteTemplate(templateId);
 
       // Remove from local state
       setTemplates(prev => {
@@ -1297,9 +1326,41 @@ export default function ThemeCustomizationPage() {
       
       toast.success('Template ถูกลบเรียบร้อยแล้ว!');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting template:', error);
-      toast.error('เกิดข้อผิดพลาดในการลบ Template');
+      
+      // Handle error from Edge Function
+      const errorData = error?.data || {};
+      const status = error?.status;
+      
+      // Check if it's a conflict error (template in use)
+      if (status === 409 && errorData.details) {
+        const cardsCount = errorData.details.cardsCount || 0;
+        const cards = errorData.details.cards || [];
+        
+        // Show detailed error message with cards using this template
+        let message = `${errorData.error || 'ไม่สามารถลบแม่แบบได้'}\n\nมีนามบัตร ${cardsCount} ใบที่กำลังใช้แม่แบบนี้อยู่:\n\n`;
+        cards.slice(0, 5).forEach((card: any, index: number) => {
+          message += `${index + 1}. ${card.name}\n`;
+        });
+        if (cardsCount > 5) {
+          message += `... และอีก ${cardsCount - 5} ใบ\n`;
+        }
+        message += '\n💡 วิธีลบแม่แบบนี้:\n';
+        message += '1. ไปที่หน้า Dashboard\n';
+        message += '2. เลือกนามบัตรที่ต้องการ\n';
+        message += '3. แก้ไขและเปลี่ยนไปใช้แม่แบบอื่น หรือลบนามบัตร\n';
+        message += '4. กลับมาลบแม่แบบนี้อีกครั้ง';
+        
+        // Use confirm instead of alert for better formatting
+        const showDetails = window.confirm(message + '\n\nต้องการไปที่หน้า Dashboard เพื่อจัดการนามบัตรเหล่านี้หรือไม่?');
+        
+        if (showDetails) {
+          window.location.href = '/dashboard';
+        }
+      } else {
+        toast.error('เกิดข้อผิดพลาดในการลบ Template: ' + (errorData.error || error?.message || 'Unknown error'));
+      }
     }
   };
 
@@ -1319,40 +1380,43 @@ export default function ThemeCustomizationPage() {
     try {
       console.log('Copying template:', copyTemplate.name, 'as:', newTemplateName);
 
-      const response = await fetch('/api/templates', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: newTemplateName,
-          paper: copyTemplate.paper,
-          elements: copyTemplate.elements,
-          user_id: user?.id,
-          preview_image: copyTemplate.previewImage
-        }),
+      // Preserve user_type from original template if it's admin or owner
+      // This ensures system templates (created by admin/owner) remain as system templates
+      const originalUserType = (copyTemplate as any).user_type;
+      const shouldPreserveUserType = originalUserType === 'admin' || originalUserType === 'owner';
+
+      const response = await createTemplate({
+        name: newTemplateName,
+        paper: copyTemplate.paper,
+        elements: copyTemplate.elements,
+        user_id: user?.id,
+        preview_image: copyTemplate.previewImage,
+        // Preserve user_type if original template was created by admin/owner
+        user_type: shouldPreserveUserType ? originalUserType : undefined
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error copying template:', errorData);
-        toast.error('เกิดข้อผิดพลาดในการคัดลอก Template: ' + errorData.error);
+      if (!response || !response.data) {
+        console.error('Error copying template:', response);
+        toast.error('เกิดข้อผิดพลาดในการคัดลอก Template');
         return;
       }
 
-      const result = await response.json();
+      const result = response.data;
       console.log('Template copied successfully:', result);
 
       // Add to local templates for immediate UI update
+      // Preserve user_type from API response (which should match original template if preserved)
       const newTemplate: Template = {
-        id: result.data.id,
+        id: result.id,
         name: newTemplateName,
         paper: copyTemplate.paper,
         elements: copyTemplate.elements,
         createdAt: new Date(),
         updatedAt: new Date(),
-        previewImage: copyTemplate.previewImage
-      };
+        previewImage: copyTemplate.previewImage,
+        // Preserve user_type from API response or original template
+        user_type: result.user_type || (copyTemplate as any).user_type
+      } as any;
       
       setTemplates(prev => [...prev, newTemplate]);
       toast.success('Template คัดลอกสำเร็จ!');
@@ -1876,6 +1940,26 @@ export default function ThemeCustomizationPage() {
                               <Edit className="w-4 h-4" />
                       </button>
                             
+                            {/* Rename Button - Only for owner/admin and templates created by owner/admin */}
+                            {(currentUserRole === 'owner' || currentUserRole === 'admin') && 
+                             ((template as any).user_type === 'admin' || (template as any).user_type === 'owner') && (
+                              <button
+                                onClick={() => {
+                                  setTemplateToRename({
+                                    id: template.id,
+                                    name: template.name,
+                                    user_type: (template as any).user_type
+                                  });
+                                  setRenameTemplateName(template.name);
+                                  setShowRenameModal(true);
+                                }}
+                                className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-100 text-orange-600 text-xs sm:text-sm rounded-lg hover:bg-orange-200 transition-colors flex items-center justify-center"
+                                title="เปลี่ยนชื่อแบบนามบัตร"
+                              >
+                                <Pencil className="w-4 h-4" />
+                              </button>
+                            )}
+                            
                             {/* Preview Button */}
                       <button
                         onClick={() => {
@@ -1958,6 +2042,71 @@ export default function ThemeCustomizationPage() {
         </div>
 
       </div>
+
+      {/* Rename Template Modal */}
+      {showRenameModal && templateToRename && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                เปลี่ยนชื่อแบบนามบัตร
+              </h3>
+              <button
+                onClick={() => {
+                  setShowRenameModal(false);
+                  setTemplateToRename(null);
+                  setRenameTemplateName('');
+                }}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                ชื่อแบบนามบัตร
+              </label>
+              <input
+                type="text"
+                value={renameTemplateName}
+                onChange={(e) => setRenameTemplateName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleRenameTemplate();
+                  } else if (e.key === 'Escape') {
+                    setShowRenameModal(false);
+                    setTemplateToRename(null);
+                    setRenameTemplateName('');
+                  }
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="กรุณากรอกชื่อแบบนามบัตร"
+                autoFocus
+              />
+            </div>
+            
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  setShowRenameModal(false);
+                  setTemplateToRename(null);
+                  setRenameTemplateName('');
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                ยกเลิก
+              </button>
+              <button
+                onClick={handleRenameTemplate}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors"
+              >
+                บันทึก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Preview Popup */}
       {previewTemplate && (

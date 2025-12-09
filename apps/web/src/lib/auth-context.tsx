@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, stopConnectionMonitor } from '@/lib/supabase/client';
+import { updateProfile as updateProfileApi } from '@/lib/api-client';
 import toast from 'react-hot-toast';
 
 interface AuthContextType {
@@ -699,38 +700,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         
         // Update basic fields first
         if (Object.keys(basicUpdate).length > 0) {
-          const basicResponse = await fetch('/api/update-profile', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              userId: user.id,
-              updates: basicUpdate 
-            }),
-          });
-          
-          if (!basicResponse.ok) {
-            throw new Error('Failed to update basic profile fields');
-          }
+          await updateProfileApi(basicUpdate, user.id);
         }
         
         // Update social fields second
         if (Object.keys(socialUpdate).length > 0) {
-          const socialResponse = await fetch('/api/update-profile', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              userId: user.id,
-              updates: socialUpdate 
-            }),
-          });
-          
-          if (!socialResponse.ok) {
-            throw new Error('Failed to update social profile fields');
-          }
+          await updateProfileApi(socialUpdate, user.id);
         }
         
         // Refresh the user session to get updated data
@@ -748,43 +723,51 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         return { data: { success: true }, error: null };
       }
       
-      const response = await fetch('/api/update-profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
+      let data;
+      try {
+        console.log('[Auth Context] Calling updateProfileApi with:', { 
+          updates: Object.keys(minimalUpdates), 
           userId: user.id,
-          updates: minimalUpdates,
-        }),
-      });
-
-      console.log('API response status:', response.status);
-
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch (jsonError) {
-          // Handle 431 error or other cases where response is not JSON
-          if (response.status === 431) {
-            errorData = { 
-              error: 'Request too large', 
-              message: 'ข้อมูลที่ส่งมีขนาดใหญ่เกินไป กรุณาลองใหม่อีกครั้ง' 
-            };
-          } else {
-            errorData = { 
-              error: 'Server error', 
-              message: 'เกิดข้อผิดพลาดจากเซิร์ฟเวอร์' 
-            };
-          }
+          updateCount: Object.keys(minimalUpdates).length,
+        });
+        data = await updateProfileApi(minimalUpdates, user.id);
+        console.log('[Auth Context] updateProfileApi success:', data);
+      } catch (error: any) {
+        console.error('[Auth Context] API error:', {
+          error,
+          data: error?.data,
+          message: error?.message,
+          status: error?.status,
+          url: error?.data?.url,
+          details: error?.data?.details,
+          hint: error?.data?.hint,
+          code: error?.data?.code,
+        });
+        
+        const errorMessage = error?.data?.error || error?.data?.details || error?.message || 'Failed to update profile';
+        const errorDetails = error?.data || { error: errorMessage };
+        
+        // Show user-friendly error message
+        if (error?.status === 0 || errorMessage.includes('Failed to connect') || errorMessage.includes('Network error')) {
+          const troubleshooting = error?.data?.troubleshooting || '';
+          toast.error(
+            'ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อหรือติดต่อผู้ดูแลระบบ',
+            { duration: 5000 }
+          );
+          console.error('[Auth Context] Network error details:', {
+            endpoint: 'update-profile',
+            url: error?.data?.url,
+            troubleshooting,
+          });
+        } else if (error?.data?.hint) {
+          // Show detailed error if available
+          toast.error(`ไม่สามารถอัพเดตโปรไฟล์ได้: ${errorMessage} (${error.data.hint})`, { duration: 7000 });
+        } else {
+          toast.error(`ไม่สามารถอัพเดตโปรไฟล์ได้: ${errorMessage}`, { duration: 5000 });
         }
-        console.error('API error:', errorData);
-        console.error('API error details:', errorData.details);
-        return { data: null, error: errorData };
+        
+        return { data: null, error: errorDetails };
       }
-
-      const data = await response.json();
       console.log('Profile updated successfully via API route');
       
       // Refresh the user session to get updated data

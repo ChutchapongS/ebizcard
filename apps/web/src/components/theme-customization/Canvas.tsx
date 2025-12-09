@@ -224,6 +224,7 @@ export function Canvas({
       'personalPhone': userData.personalPhone || userData.user_metadata?.personal_phone || '',
       'personalEmail': userData.personalEmail || userData.user_metadata?.personal_email || userData.email || '',
       'workName': userData.workName || userData.user_metadata?.company || '',
+      'workNameTh': userData.workNameTh || userData.user_metadata?.company_th || '',
       'workDepartment': userData.workDepartment || userData.user_metadata?.department || '',
       'workPosition': userData.workPosition || userData.user_metadata?.job_title || '',
       'workPhone': userData.workPhone || userData.user_metadata?.work_phone || '',
@@ -934,9 +935,9 @@ export function Canvas({
                           src={
                             (element.field && userData) 
                               ? (element.field === 'profileImage'
-                                  ? (userData?.avatar_url || userData?.user_metadata?.avatar_url)
+                                  ? (userData?.profileImage || userData?.avatar_url || userData?.user_metadata?.avatar_url || userData?.user_metadata?.profile_image || '')
                                   : element.field === 'companyLogo'
-                                    ? (userData?.user_metadata?.company_logo)
+                                    ? (userData?.companyLogo || userData?.user_metadata?.company_logo || '')
                                     : element.imageUrl)
                               : element.imageUrl || ''
                           }

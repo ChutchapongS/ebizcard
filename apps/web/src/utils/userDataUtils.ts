@@ -6,6 +6,7 @@ export interface UserData {
   personalPhone: string;
   personalEmail: string;
   workName: string;
+  workNameTh: string;
   workDepartment: string;
   workPosition: string;
   workPhone: string;
@@ -140,6 +141,7 @@ export function createUserData(profileData: any, user: any, addresses: Address[]
     personalPhone: profileData.personal_phone || user.user_metadata?.personal_phone || '',
     personalEmail: user.email || '',
     workName: profileData.company || user.user_metadata?.company || '',
+    workNameTh: profileData.company_th || user.user_metadata?.company_th || '',
     workDepartment: profileData.department || user.user_metadata?.department || '',
     workPosition: profileData.job_title || user.user_metadata?.job_title || '',
     workPhone: profileData.work_phone || user.user_metadata?.work_phone || '',
@@ -197,6 +199,7 @@ export function getUserFieldValue(field: string, userData: UserData, useAddressP
     'personalPhone': userData.personalPhone,
     'personalEmail': userData.personalEmail,
     'workName': userData.workName,
+    'workNameTh': userData.workNameTh,
     'workDepartment': userData.workDepartment,
     'workPosition': userData.workPosition,
     'workPhone': userData.workPhone,

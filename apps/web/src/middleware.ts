@@ -2,7 +2,17 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
-  // Add CORS headers to all responses
+  // Middleware is not supported in static export mode
+  // CORS headers must be configured at hosting level (S3/CloudFront) for static export
+  const isStaticExport = process.env.NEXT_STATIC_EXPORT === 'true'
+  
+  if (isStaticExport) {
+    // Return response without modification for static export
+    // CORS will be handled by hosting provider (S3/CloudFront)
+    return NextResponse.next()
+  }
+  
+  // Normal mode: Add CORS headers to all responses
   const response = NextResponse.next()
   
   response.headers.set('Access-Control-Allow-Origin', '*')

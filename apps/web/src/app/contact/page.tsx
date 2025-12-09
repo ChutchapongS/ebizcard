@@ -23,16 +23,14 @@ export default function ContactPage() {
   useEffect(() => {
     const loadContactInfo = async () => {
       try {
-        const response = await fetch('/api/admin/web-settings');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && data.settings) {
-            setContactInfo({
-              email: data.settings.contact_email || 'hello@ebizcard.com',
-              phone: data.settings.contact_phone || '+66 2-123-4567',
-              address: data.settings.contact_address || 'กรุงเทพมหานคร, ประเทศไทย',
-            });
-          }
+        const { getWebSettings } = await import('@/lib/api-client');
+        const data = await getWebSettings();
+        if (data.success && data.settings) {
+          setContactInfo({
+            email: data.settings.contact_email || 'hello@ebizcard.com',
+            phone: data.settings.contact_phone || '+66 2-123-4567',
+            address: data.settings.contact_address || 'กรุงเทพมหานคร, ประเทศไทย',
+          });
         }
       } catch (error) {
         console.warn('Error loading contact info:', error);
@@ -52,32 +50,22 @@ export default function ContactPage() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/contact', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      // Use Edge Function
+      const { sendContactMessage, getWebSettings } = await import('@/lib/api-client');
+      const data = await sendContactMessage(formData);
 
-      const data = await response.json();
-
-      if (response.ok && data.success) {
+      if (data.success) {
         if (data.emailSent) {
           toast.success('ส่งข้อความสำเร็จ! อีเมลถูกส่งแล้ว เราจะติดต่อกลับโดยเร็วที่สุด');
         } else {
-          toast.success('ส่งข้อความสำเร็จ! (ข้อมูลถูกบันทึกแล้ว)', {
+          // Form submission succeeded, but email service is not configured
+          // This is expected in development - just log to console, don't show error to user
+          if (data.emailError) {
+            console.warn('Email service not configured:', data.emailError);
+          }
+          toast.success('ส่งข้อความสำเร็จ! เราจะติดต่อกลับโดยเร็วที่สุด', {
             duration: 5000,
           });
-          if (data.emailError) {
-            console.warn('Email not sent:', data.emailError);
-            const errorMsg = typeof data.emailError === 'string' 
-              ? data.emailError 
-              : data.emailError.message || 'Email service error';
-            toast.error(`ไม่สามารถส่งอีเมลได้: ${errorMsg}`, {
-              duration: 10000,
-            });
-          }
         }
         setFormData({
           name: '',
@@ -86,7 +74,7 @@ export default function ContactPage() {
           message: '',
         });
       } else {
-        toast.error(data.error || 'ไม่สามารถส่งข้อความได้ กรุณาลองใหม่อีกครั้ง');
+        toast.error(data.message || data.emailError || 'ไม่สามารถส่งข้อความได้ กรุณาลองใหม่อีกครั้ง');
       }
     } catch (error) {
       console.error('Error sending message:', error);

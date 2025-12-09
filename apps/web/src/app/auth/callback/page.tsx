@@ -4,6 +4,11 @@ import React, { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 
+// This page uses searchParams which cannot be statically generated
+// Skip static generation for this page when using output: 'export'
+export const dynamic = 'error';
+export const revalidate = 0;
+
 /**
  * Callback page that completes the SCGJWD User Portal login handshake.
  *
@@ -145,9 +150,17 @@ export default function AuthCallbackPage() {
           return;
         }
 
-        console.log('Logged in with authorization code', {
-          user: userResult.user.email,
+        console.log('✅ Logged in with authorization code', {
+          userId: userResult.user.id,
+          email: userResult.user.email,
+          createdAt: userResult.user.created_at,
+          lastSignInAt: userResult.user.last_sign_in_at,
         });
+        
+        // Log user ID to help debug address deletion issue
+        console.log('🔍 User ID for this session:', userResult.user.id);
+        console.log('🔍 User created at:', userResult.user.created_at);
+        console.log('🔍 Previous sign in at:', userResult.user.last_sign_in_at);
 
         // Success - redirect to the return URL
         setStatus('success');

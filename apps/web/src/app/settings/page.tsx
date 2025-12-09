@@ -49,6 +49,8 @@ import {
   Gamepad2
 } from 'lucide-react';
 import { getProvinces, getDistricts, getTambons, getPostalCode } from '@/utils/address';
+import { getProvinceDisplayText, getDistrictDisplayText, getSubDistrictDisplayText, loadBilingualData, getFormattedAddressExample, convertAddressToEnglish, convertAddressToThai, isAddressInEnglish } from '@/utils/address-translation';
+import { getProfile } from '@/lib/api-client';
 import toast from 'react-hot-toast';
 
 const Layout = dynamic(
@@ -92,6 +94,15 @@ export default function SettingsPage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [activeTab, setActiveTab] = useState(1);
   const [activeAddressTab, setActiveAddressTab] = useState(1); // 1: เพิ่มที่อยู่ใหม่, 2: ที่อยู่ที่มีอยู่
+  const [isPersonalAddress1English, setIsPersonalAddress1English] = useState(false); // Language toggle for personal address 1 dropdowns
+  const [isPersonalAddress2English, setIsPersonalAddress2English] = useState(false); // Language toggle for personal address 2 dropdowns
+  const [isWorkAddress1English, setIsWorkAddress1English] = useState(false); // Language toggle for work address 1 dropdowns
+  const [isWorkAddress2English, setIsWorkAddress2English] = useState(false); // Language toggle for work address 2 dropdowns
+  
+  // Load bilingual address data on mount
+  useEffect(() => {
+    loadBilingualData();
+  }, []);
   
   // Check authentication and redirect if not logged in
   useEffect(() => {
@@ -194,6 +205,7 @@ export default function SettingsPage() {
   // Tab 2: Work Information
   const [companyLogo, setCompanyLogo] = useState(user?.user_metadata?.company_logo || '');
   const [company, setCompany] = useState(user?.user_metadata?.company || '');
+  const [companyTh, setCompanyTh] = useState(user?.user_metadata?.company_th || '');
   const [department, setDepartment] = useState(user?.user_metadata?.department || '');
   const [jobTitle, setJobTitle] = useState(user?.user_metadata?.job_title || '');
   const [workPhone, setWorkPhone] = useState(user?.user_metadata?.work_phone || '');
@@ -202,7 +214,6 @@ export default function SettingsPage() {
   
   // Tax ID fields
   const [taxIdMain, setTaxIdMain] = useState(user?.user_metadata?.tax_id_main || '');
-  const [taxIdBranch, setTaxIdBranch] = useState(user?.user_metadata?.tax_id_branch || '');
   
   // Work Addresses
   const [workAddress1, setWorkAddress1] = useState({
@@ -285,7 +296,7 @@ export default function SettingsPage() {
       setWorkEmail(user.user_metadata.work_email || '');
       setWebsite(user.user_metadata.website || '');
       setTaxIdMain(user.user_metadata.tax_id_main || '');
-      setTaxIdBranch(user.user_metadata.tax_id_branch || '');
+      setCompanyTh(user.user_metadata.company_th || '');
       setFacebook(user.user_metadata.facebook || '');
       setLineId(user.user_metadata.line_id || '');
       setLinkedin(user.user_metadata.linkedin || '');
@@ -329,19 +340,8 @@ export default function SettingsPage() {
         return;
       }
 
-      // Call API route to get profile (bypass RLS with service role)
-      // Use POST to send token in body (avoid 431 error with large tokens in header)
-      const response = await fetch('/api/get-profile', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          access_token: session.access_token,
-        }),
-      });
-      
-      const result = await response.json();
+      // Call Supabase Edge Function to get profile (bypass RLS with service role)
+      const result = await getProfile();
       
       if (result.success && result.profile) {
         const profile = result.profile;
@@ -352,12 +352,36 @@ export default function SettingsPage() {
           hasAddresses: !!profile.addresses
         });
         
-        // Parse addresses if it's a string (JSON), otherwise use as is
-        let parsedAddresses = [];
-        if (profile.addresses) {
-          parsedAddresses = typeof profile.addresses === 'string' 
+        // Load addresses from addresses table (primary source)
+        // This is the correct source since addresses are saved to addresses table
+        let addressesFromTable: any[] = [];
+        try {
+          const { getAddresses } = await import('@/lib/api-client');
+          const addressesResult = await getAddresses(user.id);
+          if (addressesResult?.data && Array.isArray(addressesResult.data)) {
+            addressesFromTable = addressesResult.data;
+            console.log('Settings: Loaded addresses from addresses table:', addressesFromTable.length);
+          }
+        } catch (addressError) {
+          console.warn('Settings: Failed to load addresses from addresses table:', addressError);
+          // Fallback to profile.addresses if addresses table fails
+          if (profile.addresses) {
+            addressesFromTable = typeof profile.addresses === 'string' 
+              ? JSON.parse(profile.addresses) 
+              : profile.addresses;
+          }
+        }
+
+        // Parse addresses from profile.addresses as fallback (if addresses table is empty)
+        let parsedAddresses = addressesFromTable.length > 0 ? addressesFromTable : [];
+        if (parsedAddresses.length === 0 && profile.addresses) {
+          const fallbackAddresses = typeof profile.addresses === 'string' 
             ? JSON.parse(profile.addresses) 
             : profile.addresses;
+          if (Array.isArray(fallbackAddresses) && fallbackAddresses.length > 0) {
+            parsedAddresses = fallbackAddresses;
+            console.log('Settings: Using fallback addresses from profile.addresses:', parsedAddresses.length);
+          }
         }
 
         // Load specific addresses from addresses table
@@ -374,48 +398,120 @@ export default function SettingsPage() {
           const workAddr2 = parsedAddresses.find((addr: any) => addr.type === 'work_2');
 
           if (personalAddr1) {
-            personalAddress1Data = {
-              place: personalAddr1.place || '',
-              address: personalAddr1.address || '',
+            // Check if address was saved in English before converting
+            const isEnglish = isAddressInEnglish({
               province: personalAddr1.province || '',
               district: personalAddr1.district || '',
               tambon: personalAddr1.tambon || '',
+            });
+            
+            // Set language switch state based on saved data
+            if (isEnglish) {
+              setIsPersonalAddress1English(true);
+            }
+            
+            // Convert from English to Thai if data was saved in English
+            const convertedAddr1 = convertAddressToThai({
+              province: personalAddr1.province || '',
+              district: personalAddr1.district || '',
+              tambon: personalAddr1.tambon || '',
+            });
+            personalAddress1Data = {
+              place: personalAddr1.place || '',
+              address: personalAddr1.address || '',
+              province: convertedAddr1.province || personalAddr1.province || '',
+              district: convertedAddr1.district || personalAddr1.district || '',
+              tambon: convertedAddr1.tambon || personalAddr1.tambon || '',
               postalCode: personalAddr1.postalCode || personalAddr1.postal_code || '',
               country: personalAddr1.country || 'Thailand'
             };
           }
 
           if (personalAddr2) {
-            personalAddress2Data = {
-              place: personalAddr2.place || '',
-              address: personalAddr2.address || '',
+            // Check if address was saved in English before converting
+            const isEnglish = isAddressInEnglish({
               province: personalAddr2.province || '',
               district: personalAddr2.district || '',
               tambon: personalAddr2.tambon || '',
+            });
+            
+            // Set language switch state based on saved data
+            if (isEnglish) {
+              setIsPersonalAddress2English(true);
+            }
+            
+            // Convert from English to Thai if data was saved in English
+            const convertedAddr2 = convertAddressToThai({
+              province: personalAddr2.province || '',
+              district: personalAddr2.district || '',
+              tambon: personalAddr2.tambon || '',
+            });
+            personalAddress2Data = {
+              place: personalAddr2.place || '',
+              address: personalAddr2.address || '',
+              province: convertedAddr2.province || personalAddr2.province || '',
+              district: convertedAddr2.district || personalAddr2.district || '',
+              tambon: convertedAddr2.tambon || personalAddr2.tambon || '',
               postalCode: personalAddr2.postalCode || personalAddr2.postal_code || '',
               country: personalAddr2.country || 'Thailand'
             };
           }
 
           if (workAddr1) {
-            workAddress1Data = {
-              place: workAddr1.place || '',
-              address: workAddr1.address || '',
+            // Check if address was saved in English before converting
+            const isEnglish = isAddressInEnglish({
               province: workAddr1.province || '',
               district: workAddr1.district || '',
               tambon: workAddr1.tambon || '',
+            });
+            
+            // Set language switch state based on saved data
+            if (isEnglish) {
+              setIsWorkAddress1English(true);
+            }
+            
+            // Convert from English to Thai if data was saved in English
+            const convertedWorkAddr1 = convertAddressToThai({
+              province: workAddr1.province || '',
+              district: workAddr1.district || '',
+              tambon: workAddr1.tambon || '',
+            });
+            workAddress1Data = {
+              place: workAddr1.place || '',
+              address: workAddr1.address || '',
+              province: convertedWorkAddr1.province || workAddr1.province || '',
+              district: convertedWorkAddr1.district || workAddr1.district || '',
+              tambon: convertedWorkAddr1.tambon || workAddr1.tambon || '',
               postalCode: workAddr1.postalCode || workAddr1.postal_code || '',
               country: workAddr1.country || 'Thailand'
             };
           }
 
           if (workAddr2) {
-            workAddress2Data = {
-              place: workAddr2.place || '',
-              address: workAddr2.address || '',
+            // Check if address was saved in English before converting
+            const isEnglish = isAddressInEnglish({
               province: workAddr2.province || '',
               district: workAddr2.district || '',
               tambon: workAddr2.tambon || '',
+            });
+            
+            // Set language switch state based on saved data
+            if (isEnglish) {
+              setIsWorkAddress2English(true);
+            }
+            
+            // Convert from English to Thai if data was saved in English
+            const convertedWorkAddr2 = convertAddressToThai({
+              province: workAddr2.province || '',
+              district: workAddr2.district || '',
+              tambon: workAddr2.tambon || '',
+            });
+            workAddress2Data = {
+              place: workAddr2.place || '',
+              address: workAddr2.address || '',
+              province: convertedWorkAddr2.province || workAddr2.province || '',
+              district: convertedWorkAddr2.district || workAddr2.district || '',
+              tambon: convertedWorkAddr2.tambon || workAddr2.tambon || '',
               postalCode: workAddr2.postalCode || workAddr2.postal_code || '',
               country: workAddr2.country || 'Thailand'
             };
@@ -433,13 +529,13 @@ export default function SettingsPage() {
           personalAddress2: personalAddress2Data,
           companyLogo: profile.company_logo || '',
           company: profile.company || '',
+          companyTh: profile.company_th || '',
           department: profile.department || '',
           jobTitle: profile.job_title || '',
           workPhone: profile.work_phone || '',
           workEmail: profile.work_email || '',
           website: profile.website || '',
           taxIdMain: profile.tax_id_main || '',
-          taxIdBranch: profile.tax_id_branch || '',
           workAddress1: workAddress1Data,
           workAddress2: workAddress2Data,
         facebook: profile.facebook || '',
@@ -477,13 +573,13 @@ export default function SettingsPage() {
         setPersonalAddress2(personalAddress2Data);
         setCompanyLogo(profile.company_logo || '');
         setCompany(profile.company || '');
+        setCompanyTh(profile.company_th || '');
         setDepartment(profile.department || '');
         setJobTitle(profile.job_title || '');
         setWorkPhone(profile.work_phone || '');
         setWorkEmail(profile.work_email || '');
         setWebsite(profile.website || '');
         setTaxIdMain(profile.tax_id_main || '');
-        setTaxIdBranch(profile.tax_id_branch || '');
         setWorkAddress1(workAddress1Data);
         setWorkAddress2(workAddress2Data);
         setFacebook(profile.facebook || '');
@@ -595,33 +691,33 @@ export default function SettingsPage() {
       const currentWorkInfo = {
         company_logo: companyLogo,
         company,
+        company_th: companyTh,
         department,
         job_title: jobTitle,
         work_phone: workPhone,
         work_email: workEmail,
         website,
         tax_id_main: taxIdMain,
-        tax_id_branch: taxIdBranch,
         work_address_1: workAddress1,
         work_address_2: workAddress2
       };
       const originalWorkInfo = {
         company_logo: originalData.companyLogo,
         company: originalData.company,
+        company_th: originalData.companyTh,
         department: originalData.department,
         job_title: originalData.jobTitle,
         work_phone: originalData.workPhone,
         work_email: originalData.workEmail,
         website: originalData.website,
         tax_id_main: originalData.taxIdMain,
-        tax_id_branch: originalData.taxIdBranch,
         work_address_1: originalData.workAddress1,
         work_address_2: originalData.workAddress2
       };
       const hasChanges = JSON.stringify(originalWorkInfo) !== JSON.stringify(currentWorkInfo);
       setHasUnsavedWorkInfo(hasChanges);
     }
-  }, [companyLogo, company, department, jobTitle, workPhone, workEmail, website, taxIdMain, taxIdBranch, workAddress1, workAddress2, originalData]);
+  }, [companyLogo, company, companyTh, department, jobTitle, workPhone, workEmail, website, taxIdMain, workAddress1, workAddress2, originalData]);
 
   // Track social media changes
   useEffect(() => {
@@ -794,21 +890,34 @@ export default function SettingsPage() {
           let personalAddress2Id = null;
           
           if (personalAddress1.address || personalAddress1.province) {
-            personalAddress1Id = await saveAddressToDatabase(personalAddress1, 'personal_1');
+            // Convert to English if user selected English
+            const addressToSave = isPersonalAddress1English 
+              ? convertAddressToEnglish(personalAddress1)
+              : personalAddress1;
+            personalAddress1Id = await saveAddressToDatabase(addressToSave, 'personal_1');
+            console.log('Personal address 1 saved, ID:', personalAddress1Id);
+          } else {
+            console.log('Personal address 1 is empty, will set personal_address_1_id to null');
           }
           
           if (personalAddress2.address || personalAddress2.province) {
-            personalAddress2Id = await saveAddressToDatabase(personalAddress2, 'personal_2');
+            // Convert to English if user selected English
+            const addressToSave = isPersonalAddress2English 
+              ? convertAddressToEnglish(personalAddress2)
+              : personalAddress2;
+            personalAddress2Id = await saveAddressToDatabase(addressToSave, 'personal_2');
+            console.log('Personal address 2 saved, ID:', personalAddress2Id);
+          } else {
+            console.log('Personal address 2 is empty, will set personal_address_2_id to null');
           }
 
-          // Metadata: เฉพาะข้อมูลไม่รวมรูป
+          // Metadata: เฉพาะข้อมูลไม่รวมรูป (ไม่รวม addresses เพราะเก็บใน addresses table)
           metadataUpdates = {
             full_name: fullName.trim(),
             full_name_english: fullNameEnglish.trim(),
             personal_phone: personalPhone.trim(),
             personal_id: personalId.trim(),
-            personal_address_1: personalAddress1,
-            personal_address_2: personalAddress2,
+            // Note: personal_address_1 and personal_address_2 are stored in addresses table, not user_metadata
           };
           // Profiles table: รวมรูป
           profileTableUpdates = {
@@ -840,38 +949,57 @@ export default function SettingsPage() {
           let workAddress2Id = null;
           
           if (workAddress1.address || workAddress1.province) {
-            workAddress1Id = await saveAddressToDatabase(workAddress1, 'work_1');
+            // Convert to English if user selected English
+            const addressToSave = isWorkAddress1English 
+              ? convertAddressToEnglish(workAddress1)
+              : workAddress1;
+            workAddress1Id = await saveAddressToDatabase(addressToSave, 'work_1');
+            console.log('Work address 1 saved, ID:', workAddress1Id);
+          } else {
+            console.log('Work address 1 is empty, will set work_address_1_id to null');
           }
           
           if (workAddress2.address || workAddress2.province) {
-            workAddress2Id = await saveAddressToDatabase(workAddress2, 'work_2');
+            // Convert to English if user selected English
+            const addressToSave = isWorkAddress2English 
+              ? convertAddressToEnglish(workAddress2)
+              : workAddress2;
+            workAddress2Id = await saveAddressToDatabase(addressToSave, 'work_2');
+            console.log('Work address 2 saved, ID:', workAddress2Id);
+          } else {
+            console.log('Work address 2 is empty, will set work_address_2_id to null');
           }
 
           metadataUpdates = {
             company: company.trim(),
+            company_th: companyTh.trim(),
             department: department.trim(),
             job_title: jobTitle.trim(),
             work_phone: workPhone.trim(),
             work_email: workEmail.trim(),
             website: website.trim(),
             tax_id_main: taxIdMain.trim(),
-            tax_id_branch: taxIdBranch.trim(),
-            work_address_1: workAddress1,
-            work_address_2: workAddress2,
+            // Note: work_address_1 and work_address_2 are stored in addresses table, not user_metadata
           };
           profileTableUpdates = {
             company_logo: uploadedCompanyLogoUrl,
             company: company.trim(),
+            company_th: companyTh.trim(),
             department: department.trim(),
             job_title: jobTitle.trim(),
             work_phone: workPhone.trim(),
             work_email: workEmail.trim(),
             website: website.trim(),
             tax_id_main: taxIdMain.trim(),
-            tax_id_branch: taxIdBranch.trim(),
             work_address_1_id: workAddress1Id,
             work_address_2_id: workAddress2Id,
           };
+          
+          console.log('Profile table updates (Work Info):', {
+            work_address_1_id: workAddress1Id,
+            work_address_2_id: workAddress2Id,
+            allFields: Object.keys(profileTableUpdates),
+          });
           tabName = 'ข้อมูลที่ทำงาน';
           break;
 
@@ -974,19 +1102,18 @@ export default function SettingsPage() {
         return;
       }
       
-      const response = await fetch('/api/update-profiles-table', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          access_token: session.access_token,
-          updates: updates,
-        }),
-      });
-      
-      if (!response.ok) {
+      // Use Edge Function update-profile instead of API route
+      const { updateProfile } = await import('@/lib/api-client');
+      try {
+        const result = await updateProfile(updates, session.user.id);
+        // updateProfile returns { success: boolean; error: null }
+        if (!result.success) {
         throw new Error('Failed to update profiles table');
+        }
+      } catch (error: any) {
+        // Handle API errors
+        const errorMessage = error?.data?.error || error?.message || 'Failed to update profiles table';
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error('❌ Error updating profiles table:', error);
@@ -1016,23 +1143,19 @@ export default function SettingsPage() {
         country: addressData.country || 'Thailand'
       };
 
-      const response = await fetch('/api/save-address', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          access_token: session.access_token,
-          address: addressPayload
-        }),
+      // Use Edge Function
+      const { saveAddress } = await import('@/lib/api-client');
+      const result = await saveAddress({
+        ...addressPayload,
+        user_id: user.id
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to save address');
+      if (!result || !result.id) {
+        console.error('❌ saveAddress returned invalid result:', result);
+        return null;
       }
 
-      const result = await response.json();
+      console.log(`✅ Address saved (type: ${type}, id: ${result.id})`);
       return result.id;
       
     } catch (error) {
@@ -1051,21 +1174,9 @@ export default function SettingsPage() {
         return;
       }
       
-      const response = await fetch('/api/update-addresses', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          access_token: session.access_token,
-          addresses: addressesList,
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to update addresses');
-      }
+      // Use Edge Function
+      const { updateAddresses } = await import('@/lib/api-client');
+      await updateAddresses(addressesList, user.id);
     } catch (error) {
       console.error('❌ Error updating addresses table:', error);
       throw error;
@@ -1272,17 +1383,9 @@ export default function SettingsPage() {
         throw new Error('ไม่พบ session');
       }
       
-      const formData = new FormData();
-      formData.append('profile', file);
-      formData.append('access_token', session.access_token);
-      
-      const response = await fetch('/api/upload-profile', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData
-      });
-      
-      const result = await response.json();
+      // Use Edge Function
+      const { uploadProfile } = await import('@/lib/api-client');
+      const result = await uploadProfile(file);
       
       if (result.success) {
         return result.imageUrl;
@@ -1347,43 +1450,10 @@ export default function SettingsPage() {
   // Function to upload company logo and return URL
   const uploadCompanyLogo = async (file: File): Promise<string> => {
     try {
-      const { supabase } = await import('@/lib/supabase/client');
-
-      if (!supabase) {
-        throw new Error('ไม่สามารถเชื่อมต่อฐานข้อมูลได้');
-      }
-
-      // Get current user
-      const { data: { user }, error: authError } = await supabase!.auth.getUser();
-      
-      if (authError || !user) {
-        throw new Error('ไม่พบผู้ใช้');
-      }
-      
-      // Get session token
-      const { data: { session } } = await supabase!.auth.getSession();
-      
-      if (!session?.access_token) {
-        throw new Error('ไม่พบ session');
-      }
-      
-      const formData = new FormData();
-      formData.append('company_logo', file);
-      formData.append('access_token', session.access_token);
-      
-      const response = await fetch('/api/upload-company-logo', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData
-      });
-      
-      const result = await response.json();
-      
-      if (result.success) {
-        return result.imageUrl;
-      } else {
-        throw new Error(result.error || 'Upload ล้มเหลว');
-      }
+      // Use Edge Function
+      const { uploadLogo } = await import('@/lib/api-client');
+      const result = await uploadLogo(file, 'company');
+      return result.url || result.imageUrl || '';
     } catch (error) {
       console.error('❌ Upload error:', error);
       throw error;
@@ -1541,17 +1611,12 @@ export default function SettingsPage() {
     try {
       setIsLoading(true);
 
-      const response = await fetch('/api/delete-account', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
+      // Use Edge Function
+      const { deleteAccount } = await import('@/lib/api-client');
+      const data = await deleteAccount();
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'เกิดข้อผิดพลาดในการลบบัญชี');
+      if (!data.success) {
+        throw new Error('เกิดข้อผิดพลาดในการลบบัญชี');
       }
 
       toast.success('ลบบัญชีเรียบร้อยแล้ว');
@@ -1839,11 +1904,34 @@ export default function SettingsPage() {
 
                   {/* Personal Addresses */}
                   <div className="space-y-6">
-                    <h3 className="text-lg font-medium text-gray-900">ที่อยู่ส่วนตัว</h3>
+
                     
                     {/* Personal Address 1 */}
                     <div className="border border-gray-200 rounded-lg p-4">
-                      <h4 className="text-md font-medium text-gray-700 mb-4">ที่อยู่ส่วนตัว (1)</h4>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-md font-medium text-gray-700">ที่อยู่ส่วนตัว (1)</h4>
+                        <div className="flex items-center space-x-3">
+                          <span className={`text-sm ${!isPersonalAddress1English ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
+                            ไทย
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsPersonalAddress1English(!isPersonalAddress1English)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                              isPersonalAddress1English ? 'bg-blue-600' : 'bg-gray-300'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                isPersonalAddress1English ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                          <span className={`text-sm ${isPersonalAddress1English ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
+                            English
+                          </span>
+                        </div>
+                      </div>
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1876,7 +1964,14 @@ export default function SettingsPage() {
                               ตัวอย่างที่อยู่
                             </label>
                             <textarea
-                              value={`${personalAddress1.address || ''}${personalAddress1.tambon ? `, ${personalAddress1.tambon}` : ''}${personalAddress1.district ? `, ${personalAddress1.district}` : ''}${personalAddress1.province ? `, ${personalAddress1.province}` : ''}${personalAddress1.postalCode ? ` ${personalAddress1.postalCode}` : ''}`}
+                              value={getFormattedAddressExample(
+                                personalAddress1.address || '',
+                                personalAddress1.tambon || '',
+                                personalAddress1.district || '',
+                                personalAddress1.province || '',
+                                personalAddress1.postalCode || '',
+                                isPersonalAddress1English
+                              )}
                               disabled
                               className="w-full px-4 py-3 min-h-[80px] resize-none bg-gray-50 border border-gray-300 rounded-lg text-xs text-gray-600"
                               rows={3}
@@ -1903,10 +1998,10 @@ export default function SettingsPage() {
                               }}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกจังหวัด</option>
+                              <option value="">{isPersonalAddress1English ? 'Select Province' : 'เลือกจังหวัด'}</option>
                               {getProvinces().map((province) => (
                                 <option key={province} value={province}>
-                                  {province}
+                                  {getProvinceDisplayText(province, isPersonalAddress1English)}
                                 </option>
                               ))}
                             </select>
@@ -1932,10 +2027,10 @@ export default function SettingsPage() {
                               disabled={!personalAddress1.province}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกอำเภอ/เขต</option>
+                              <option value="">{isPersonalAddress1English ? 'Select District' : 'เลือกอำเภอ/เขต'}</option>
                               {personalAddress1.province && getDistricts(personalAddress1.province).map((district) => (
                                 <option key={district} value={district}>
-                                  {district}
+                                  {getDistrictDisplayText(district, personalAddress1.province, isPersonalAddress1English)}
                                 </option>
                               ))}
                             </select>
@@ -1966,11 +2061,11 @@ export default function SettingsPage() {
                               disabled={!personalAddress1.district}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกตำบล/แขวง</option>
+                              <option value="">{isPersonalAddress1English ? 'Select Sub-district' : 'เลือกตำบล/แขวง'}</option>
                               {personalAddress1.province && personalAddress1.district && 
                                 getTambons(personalAddress1.province, personalAddress1.district).map((tambon: string, tambonIndex: number) => (
                                   <option key={`${personalAddress1.province}-${personalAddress1.district}-${tambon}-${tambonIndex}`} value={tambon}>
-                                    {tambon}
+                                    {getSubDistrictDisplayText(tambon, personalAddress1.district, personalAddress1.province, isPersonalAddress1English)}
                                   </option>
                                 ))}
                             </select>
@@ -1994,7 +2089,30 @@ export default function SettingsPage() {
 
                     {/* Personal Address 2 */}
                     <div className="border border-gray-200 rounded-lg p-4">
-                      <h4 className="text-md font-medium text-gray-700 mb-4">ที่อยู่ส่วนตัว (2)</h4>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-md font-medium text-gray-700">ที่อยู่ส่วนตัว (2)</h4>
+                        <div className="flex items-center space-x-3">
+                          <span className={`text-sm ${!isPersonalAddress2English ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
+                            ไทย
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsPersonalAddress2English(!isPersonalAddress2English)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                              isPersonalAddress2English ? 'bg-blue-600' : 'bg-gray-300'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                isPersonalAddress2English ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                          <span className={`text-sm ${isPersonalAddress2English ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
+                            English
+                          </span>
+                        </div>
+                      </div>
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2027,7 +2145,14 @@ export default function SettingsPage() {
                               ตัวอย่างที่อยู่
                             </label>
                             <textarea
-                              value={`${personalAddress2.address || ''}${personalAddress2.tambon ? `, ${personalAddress2.tambon}` : ''}${personalAddress2.district ? `, ${personalAddress2.district}` : ''}${personalAddress2.province ? `, ${personalAddress2.province}` : ''}${personalAddress2.postalCode ? ` ${personalAddress2.postalCode}` : ''}`}
+                              value={getFormattedAddressExample(
+                                personalAddress2.address || '',
+                                personalAddress2.tambon || '',
+                                personalAddress2.district || '',
+                                personalAddress2.province || '',
+                                personalAddress2.postalCode || '',
+                                isPersonalAddress2English
+                              )}
                               disabled
                               className="w-full px-4 py-3 min-h-[80px] resize-none bg-gray-50 border border-gray-300 rounded-lg text-xs text-gray-600"
                               rows={3}
@@ -2054,10 +2179,10 @@ export default function SettingsPage() {
                               }}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกจังหวัด</option>
+                              <option value="">{isPersonalAddress2English ? 'Select Province' : 'เลือกจังหวัด'}</option>
                               {getProvinces().map((province) => (
                                 <option key={province} value={province}>
-                                  {province}
+                                  {getProvinceDisplayText(province, isPersonalAddress2English)}
                                 </option>
                               ))}
                             </select>
@@ -2083,10 +2208,10 @@ export default function SettingsPage() {
                               disabled={!personalAddress2.province}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกอำเภอ/เขต</option>
+                              <option value="">{isPersonalAddress2English ? 'Select District' : 'เลือกอำเภอ/เขต'}</option>
                               {personalAddress2.province && getDistricts(personalAddress2.province).map((district) => (
                                 <option key={district} value={district}>
-                                  {district}
+                                  {getDistrictDisplayText(district, personalAddress2.province, isPersonalAddress2English)}
                                 </option>
                               ))}
                             </select>
@@ -2100,8 +2225,14 @@ export default function SettingsPage() {
                               value={personalAddress2.tambon || ''}
                               onChange={(e) => {
                                 const tambon = e.target.value;
-                                const postalCode = personalAddress2.province && personalAddress2.district && tambon ? 
+                                let postalCode = personalAddress2.province && personalAddress2.district && tambon ? 
                                   (getPostalCode(personalAddress2.province, personalAddress2.district) || '') : '';
+                                
+                                // Special case for ตำบลแสนสุข in เมืองชลบุรี
+                                if (personalAddress2.province === 'ชลบุรี' && personalAddress2.district === 'เมืองชลบุรี' && tambon === 'แสนสุข') {
+                                  postalCode = 20130;
+                                }
+                                
                                 setPersonalAddress2({
                                   ...personalAddress2,
                                   tambon,
@@ -2111,11 +2242,11 @@ export default function SettingsPage() {
                               disabled={!personalAddress2.district}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกตำบล/แขวง</option>
+                              <option value="">{isPersonalAddress2English ? 'Select Sub-district' : 'เลือกตำบล/แขวง'}</option>
                               {personalAddress2.province && personalAddress2.district && 
                                 getTambons(personalAddress2.province, personalAddress2.district).map((tambon: string, tambonIndex: number) => (
                                   <option key={`${personalAddress2.province}-${personalAddress2.district}-${tambon}-${tambonIndex}`} value={tambon}>
-                                    {tambon}
+                                    {getSubDistrictDisplayText(tambon, personalAddress2.district, personalAddress2.province, isPersonalAddress2English)}
                                   </option>
                                 ))}
                             </select>
@@ -2142,42 +2273,43 @@ export default function SettingsPage() {
               
               {/* Tab 2: Work Information */}
               {activeTab === 2 && (
-                <div className="space-y-6">
-                  {/* Row 1: Company Logo, Company Name, Department */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Company Logo */}
-                    <div>
+                <div className="space-y-0">
+                  {/* All 4 rows in one grid: Company Logo (span 4 rows), Company Name, Company Name Thai, Website, Tax ID Main, Department, Job Title, Work Phone, Work Email */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 md:grid-rows-4 gap-x-6 gap-y-6 mb-12">
+                    {/* Company Logo - spans 4 rows */}
+                    <div className="row-span-4">
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         รูป Logo บริษัท
                       </label>
-                      <div className="flex items-center space-x-4">
-                        <div className="relative">
-                          <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden relative">
+                      <div className="flex flex-col items-start space-y-4 w-full">
+                        <div className="relative w-full">
+                          <div className="w-full aspect-[4/3] max-w-full bg-gray-100 rounded-lg flex items-center justify-center overflow-hidden relative border border-gray-200">
                             {companyLogo ? (
                               <NextImage
                                 src={companyLogo}
                                 alt="Company Logo"
                                 fill
-                                className="object-cover"
-                                sizes="80px"
+                                className="object-contain p-2"
+                                sizes="(max-width: 768px) 100vw, 400px"
                                 unoptimized
                                 onError={() => setCompanyLogo('')}
                               />
                             ) : (
-                              <Building className="w-8 h-8 text-gray-400" />
+                              <Building className="w-16 h-16 text-gray-400" />
                             )}
                           </div>
                           {isUploadingCompanyLogo && (
                             <div className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center">
-                              <span className="text-white text-xs mt-2">กำลังโหลด...</span>
+                              <span className="text-white text-xs">กำลังโหลด...</span>
                             </div>
                           )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-row gap-2 w-full">
                           <label className={`cursor-pointer flex-1 ${isUploadingCompanyLogo ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                            <div className="flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                              <Upload className="w-4 h-4 mr-2" />
-                              {isUploadingCompanyLogo ? 'กำลังโหลด...' : companyLogo ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}
+                            <div className="flex items-center justify-center px-2 py-1.5 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50">
+                              <Upload className="w-3 h-3 mr-1" />
+                              <span className="hidden sm:inline">{isUploadingCompanyLogo ? 'กำลังโหลด...' : companyLogo ? 'เปลี่ยนรูป' : 'อัปโหลดรูป'}</span>
+                              <span className="sm:hidden">{isUploadingCompanyLogo ? '...' : companyLogo ? 'เปลี่ยน' : 'อัปโหลด'}</span>
                             </div>
                             <input
                               type="file"
@@ -2191,18 +2323,19 @@ export default function SettingsPage() {
                             <button
                               type="button"
                               onClick={handleRemoveCompanyLogo}
-                              className="px-4 py-2 border border-red-300 rounded-md shadow-sm text-sm font-medium text-red-600 bg-white hover:bg-red-50 transition-colors flex items-center"
+                              className="px-2 py-1.5 border border-red-300 rounded-md shadow-sm text-xs font-medium text-red-600 bg-white hover:bg-red-50 transition-colors flex items-center justify-center min-w-[60px]"
                               title="ยกเลิกรูป Company Logo"
                               disabled={isUploadingCompanyLogo}
                             >
-                              <X className="w-4 h-4" />
+                              <X className="w-3 h-3 mr-1" />
+                              <span>ลบ</span>
                             </button>
                           )}
                         </div>
                       </div>
                     </div>
                     
-                    {/* Company Name */}
+                    {/* Company Name - Row 1, Column 2 */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <Building className="w-4 h-4 inline mr-2" />
@@ -2217,72 +2350,22 @@ export default function SettingsPage() {
                       />
                     </div>
                     
-                    {/* Department */}
+                    {/* Company Name (Thai) - Row 1, Column 3 */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        แผนก/ส่วนงาน
+                        <Building className="w-4 h-4 inline mr-2" />
+                        ชื่อบริษัท (ไทย)
                       </label>
                       <input
                         type="text"
-                        value={department}
-                        onChange={(e) => setDepartment(e.target.value)}
+                        value={companyTh}
+                        onChange={(e) => setCompanyTh(e.target.value)}
                         className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-                        placeholder="กรอกแผนก/ส่วนงาน"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Row 2: Job Title, Work Phone, Work Email */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Job Title */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Briefcase className="w-4 h-4 inline mr-2" />
-                        ตำแหน่งงาน
-                      </label>
-                      <input
-                        type="text"
-                        value={jobTitle}
-                        onChange={(e) => setJobTitle(e.target.value)}
-                        className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-                        placeholder="กรอกตำแหน่งงาน"
+                        placeholder="กรอกชื่อบริษัท (ภาษาไทย)"
                       />
                     </div>
                     
-                    {/* Work Phone */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Phone className="w-4 h-4 inline mr-2" />
-                        เบอร์โทรศัพท์ที่ทำงาน
-                      </label>
-                      <input
-                        type="tel"
-                        value={workPhone}
-                        onChange={(e) => setWorkPhone(e.target.value)}
-                        className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-                        placeholder="กรอกเบอร์โทรศัพท์ที่ทำงาน"
-                      />
-                    </div>
-                    
-                    {/* Work Email */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <Mail className="w-4 h-4 inline mr-2" />
-                        อีเมลที่ทำงาน
-                      </label>
-                      <input
-                        type="email"
-                        value={workEmail}
-                        onChange={(e) => setWorkEmail(e.target.value)}
-                        className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-                        placeholder="กรอกอีเมลที่ทำงาน"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Row 3: Website, Tax ID Main, Tax ID Branch */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* Website */}
+                    {/* Website - Row 2, Column 2 */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <Globe className="w-4 h-4 inline mr-2" />
@@ -2297,7 +2380,7 @@ export default function SettingsPage() {
                       />
                     </div>
                     
-                    {/* Tax ID Main */}
+                    {/* Tax ID Main - Row 2, Column 3 */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         เลขประจำตัวผู้เสียภาษี (สำนักงานใหญ่)
@@ -2311,28 +2394,94 @@ export default function SettingsPage() {
                       />
                     </div>
                     
-                    {/* Tax ID Branch */}
+                    {/* Department - Row 3, Column 2 */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        เลขประจำตัวผู้เสียภาษี (สาขาย่อย) (ถ้ามี)
+                        แผนก/ส่วนงาน
                       </label>
                       <input
                         type="text"
-                        value={taxIdBranch}
-                        onChange={(e) => setTaxIdBranch(e.target.value)}
+                        value={department}
+                        onChange={(e) => setDepartment(e.target.value)}
                         className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
-                        placeholder="กรอกเลขประจำตัวผู้เสียภาษี (สาขาย่อย)"
+                        placeholder="กรอกแผนก/ส่วนงาน"
+                      />
+                    </div>
+                    
+                    {/* Job Title - Row 3, Column 3 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <Briefcase className="w-4 h-4 inline mr-2" />
+                        ตำแหน่งงาน
+                      </label>
+                      <input
+                        type="text"
+                        value={jobTitle}
+                        onChange={(e) => setJobTitle(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+                        placeholder="กรอกตำแหน่งงาน"
+                      />
+                    </div>
+                    
+                    {/* Work Phone - Row 4, Column 2 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <Phone className="w-4 h-4 inline mr-2" />
+                        เบอร์โทรศัพท์ที่ทำงาน
+                      </label>
+                      <input
+                        type="tel"
+                        value={workPhone}
+                        onChange={(e) => setWorkPhone(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+                        placeholder="กรอกเบอร์โทรศัพท์ที่ทำงาน"
+                      />
+                    </div>
+                    
+                    {/* Work Email - Row 4, Column 3 */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <Mail className="w-4 h-4 inline mr-2" />
+                        อีเมลที่ทำงาน
+                      </label>
+                      <input
+                        type="email"
+                        value={workEmail}
+                        onChange={(e) => setWorkEmail(e.target.value)}
+                        className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
+                        placeholder="กรอกอีเมลที่ทำงาน"
                       />
                     </div>
                   </div>
 
                   {/* Work Addresses */}
-                  <div className="space-y-6">
-                    <h3 className="text-lg font-medium text-gray-900">ที่อยู่ที่ทำงาน</h3>
-                    
+                  <div className="space-y-16 mt-12">
                     {/* Work Address 1 */}
                     <div className="border border-gray-200 rounded-lg p-4">
-                      <h4 className="text-md font-medium text-gray-700 mb-4">ที่อยู่ที่ทำงาน (1)</h4>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-md font-medium text-gray-700">ที่อยู่ที่ทำงาน (1)</h4>
+                        <div className="flex items-center space-x-3">
+                          <span className={`text-sm ${!isWorkAddress1English ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
+                            ไทย
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsWorkAddress1English(!isWorkAddress1English)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                              isWorkAddress1English ? 'bg-blue-600' : 'bg-gray-300'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                isWorkAddress1English ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                          <span className={`text-sm ${isWorkAddress1English ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
+                            English
+                          </span>
+                        </div>
+                      </div>
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2365,7 +2514,14 @@ export default function SettingsPage() {
                               ตัวอย่างที่อยู่
                             </label>
                             <textarea
-                              value={`${workAddress1.address || ''}${workAddress1.tambon ? `, ${workAddress1.tambon}` : ''}${workAddress1.district ? `, ${workAddress1.district}` : ''}${workAddress1.province ? `, ${workAddress1.province}` : ''}${workAddress1.postalCode ? ` ${workAddress1.postalCode}` : ''}`}
+                              value={getFormattedAddressExample(
+                                workAddress1.address || '',
+                                workAddress1.tambon || '',
+                                workAddress1.district || '',
+                                workAddress1.province || '',
+                                workAddress1.postalCode || '',
+                                isWorkAddress1English
+                              )}
                               disabled
                               className="w-full px-4 py-3 min-h-[80px] resize-none bg-gray-50 border border-gray-300 rounded-lg text-xs text-gray-600"
                               rows={3}
@@ -2392,10 +2548,10 @@ export default function SettingsPage() {
                               }}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกจังหวัด</option>
+                              <option value="">{isWorkAddress1English ? 'Select Province' : 'เลือกจังหวัด'}</option>
                               {getProvinces().map((province) => (
                                 <option key={province} value={province}>
-                                  {province}
+                                  {getProvinceDisplayText(province, isWorkAddress1English)}
                                 </option>
                               ))}
                             </select>
@@ -2421,10 +2577,10 @@ export default function SettingsPage() {
                               disabled={!workAddress1.province}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกอำเภอ/เขต</option>
+                              <option value="">{isWorkAddress1English ? 'Select District' : 'เลือกอำเภอ/เขต'}</option>
                               {workAddress1.province && getDistricts(workAddress1.province).map((district) => (
                                 <option key={district} value={district}>
-                                  {district}
+                                  {getDistrictDisplayText(district, workAddress1.province, isWorkAddress1English)}
                                 </option>
                               ))}
                             </select>
@@ -2438,8 +2594,14 @@ export default function SettingsPage() {
                               value={workAddress1.tambon || ''}
                               onChange={(e) => {
                                 const tambon = e.target.value;
-                                const postalCode = workAddress1.province && workAddress1.district && tambon ? 
+                                let postalCode = workAddress1.province && workAddress1.district && tambon ? 
                                   (getPostalCode(workAddress1.province, workAddress1.district) || '') : '';
+                                
+                                // Special case for ตำบลแสนสุข in เมืองชลบุรี
+                                if (workAddress1.province === 'ชลบุรี' && workAddress1.district === 'เมืองชลบุรี' && tambon === 'แสนสุข') {
+                                  postalCode = 20130;
+                                }
+                                
                                 setWorkAddress1({
                                   ...workAddress1,
                                   tambon,
@@ -2449,11 +2611,11 @@ export default function SettingsPage() {
                               disabled={!workAddress1.district}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกตำบล/แขวง</option>
+                              <option value="">{isWorkAddress1English ? 'Select Sub-district' : 'เลือกตำบล/แขวง'}</option>
                               {workAddress1.province && workAddress1.district && 
                                 getTambons(workAddress1.province, workAddress1.district).map((tambon: string, tambonIndex: number) => (
                                   <option key={`${workAddress1.province}-${workAddress1.district}-${tambon}-${tambonIndex}`} value={tambon}>
-                                    {tambon}
+                                    {getSubDistrictDisplayText(tambon, workAddress1.district, workAddress1.province, isWorkAddress1English)}
                                   </option>
                                 ))}
                             </select>
@@ -2477,7 +2639,30 @@ export default function SettingsPage() {
 
                     {/* Work Address 2 */}
                     <div className="border border-gray-200 rounded-lg p-4">
-                      <h4 className="text-md font-medium text-gray-700 mb-4">ที่อยู่ที่ทำงาน (2)</h4>
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-md font-medium text-gray-700">ที่อยู่ที่ทำงาน (2)</h4>
+                        <div className="flex items-center space-x-3">
+                          <span className={`text-sm ${!isWorkAddress2English ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
+                            ไทย
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setIsWorkAddress2English(!isWorkAddress2English)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                              isWorkAddress2English ? 'bg-blue-600' : 'bg-gray-300'
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                isWorkAddress2English ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                          <span className={`text-sm ${isWorkAddress2English ? 'font-medium text-gray-900' : 'text-gray-500'}`}>
+                            English
+                          </span>
+                        </div>
+                      </div>
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2510,7 +2695,14 @@ export default function SettingsPage() {
                               ตัวอย่างที่อยู่
                             </label>
                             <textarea
-                              value={`${workAddress2.address || ''}${workAddress2.tambon ? `, ${workAddress2.tambon}` : ''}${workAddress2.district ? `, ${workAddress2.district}` : ''}${workAddress2.province ? `, ${workAddress2.province}` : ''}${workAddress2.postalCode ? ` ${workAddress2.postalCode}` : ''}`}
+                              value={getFormattedAddressExample(
+                                workAddress2.address || '',
+                                workAddress2.tambon || '',
+                                workAddress2.district || '',
+                                workAddress2.province || '',
+                                workAddress2.postalCode || '',
+                                isWorkAddress2English
+                              )}
                               disabled
                               className="w-full px-4 py-3 min-h-[80px] resize-none bg-gray-50 border border-gray-300 rounded-lg text-xs text-gray-600"
                               rows={3}
@@ -2537,10 +2729,10 @@ export default function SettingsPage() {
                               }}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกจังหวัด</option>
+                              <option value="">{isWorkAddress2English ? 'Select Province' : 'เลือกจังหวัด'}</option>
                               {getProvinces().map((province) => (
                                 <option key={province} value={province}>
-                                  {province}
+                                  {getProvinceDisplayText(province, isWorkAddress2English)}
                                 </option>
                               ))}
                             </select>
@@ -2566,10 +2758,10 @@ export default function SettingsPage() {
                               disabled={!workAddress2.province}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกอำเภอ/เขต</option>
+                              <option value="">{isWorkAddress2English ? 'Select District' : 'เลือกอำเภอ/เขต'}</option>
                               {workAddress2.province && getDistricts(workAddress2.province).map((district) => (
                                 <option key={district} value={district}>
-                                  {district}
+                                  {getDistrictDisplayText(district, workAddress2.province, isWorkAddress2English)}
                                 </option>
                               ))}
                             </select>
@@ -2583,8 +2775,14 @@ export default function SettingsPage() {
                               value={workAddress2.tambon || ''}
                               onChange={(e) => {
                                 const tambon = e.target.value;
-                                const postalCode = workAddress2.province && workAddress2.district && tambon ? 
+                                let postalCode = workAddress2.province && workAddress2.district && tambon ? 
                                   (getPostalCode(workAddress2.province, workAddress2.district) || '') : '';
+                                
+                                // Special case for ตำบลแสนสุข in เมืองชลบุรี
+                                if (workAddress2.province === 'ชลบุรี' && workAddress2.district === 'เมืองชลบุรี' && tambon === 'แสนสุข') {
+                                  postalCode = 20130;
+                                }
+                                
                                 setWorkAddress2({
                                   ...workAddress2,
                                   tambon,
@@ -2594,11 +2792,11 @@ export default function SettingsPage() {
                               disabled={!workAddress2.district}
                               className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                             >
-                              <option value="">เลือกตำบล/แขวง</option>
+                              <option value="">{isWorkAddress2English ? 'Select Sub-district' : 'เลือกตำบล/แขวง'}</option>
                               {workAddress2.province && workAddress2.district && 
                                 getTambons(workAddress2.province, workAddress2.district).map((tambon: string, tambonIndex: number) => (
                                   <option key={`${workAddress2.province}-${workAddress2.district}-${tambon}-${tambonIndex}`} value={tambon}>
-                                    {tambon}
+                                    {getSubDistrictDisplayText(tambon, workAddress2.district, workAddress2.province, isWorkAddress2English)}
                                   </option>
                                 ))}
                             </select>
@@ -3080,7 +3278,18 @@ export default function SettingsPage() {
                               </label>
                               <select
                                 value={newAddress.tambon}
-                                onChange={(e) => setNewAddress({ ...newAddress, tambon: e.target.value })}
+                                onChange={(e) => {
+                                  const tambon = e.target.value;
+                                  let postalCode = newAddress.province && newAddress.district && tambon ? 
+                                    (getPostalCode(newAddress.province, newAddress.district) || '') : '';
+                                  
+                                  // Special case for ตำบลแสนสุข in เมืองชลบุรี
+                                  if (newAddress.province === 'ชลบุรี' && newAddress.district === 'เมืองชลบุรี' && tambon === 'แสนสุข') {
+                                    postalCode = 20130;
+                                  }
+                                  
+                                  setNewAddress({ ...newAddress, tambon, postalCode: postalCode.toString() });
+                                }}
                                 disabled={!newAddress.district}
                                 className="w-full px-4 py-3 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-xs"
                               >

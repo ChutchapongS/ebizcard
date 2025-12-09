@@ -104,24 +104,15 @@ export const PaperCardExporter = ({ card, onClose }: PaperCardExporterProps) => 
 
   const handleExport = async (format: 'pdf' | 'png' | 'svg') => {
     try {
-      const response = await fetch('/api/export-paper-card', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          cardId: card.id,
-          template: selectedTemplate,
-          settings: paperSettings,
-          format,
-        }),
+      // Use Edge Function
+      const { exportPaperCard } = await import('@/lib/api-client');
+      const blob = await exportPaperCard({
+        cardId: card.id,
+        template: selectedTemplate,
+        settings: paperSettings,
+        format,
       });
 
-      if (!response.ok) {
-        throw new Error('Export failed');
-      }
-
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
